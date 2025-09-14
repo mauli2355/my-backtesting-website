@@ -4,6 +4,7 @@ import yfinance as yf
 from datetime import datetime
 import pandas as pd
 import plotly.graph_objects as go
+import traceback  # <-- हा नवीन आणि महत्त्वाचा 'डिटेक्टिव्ह' आहे
 
 # Matplotlib backend setting Agg for headless servers
 import matplotlib
@@ -12,67 +13,47 @@ import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 
-# --- Strategy 1: EMA Crossover ---
+# --- सर्व Strategy Classes येथे आहेत (यात कोणताही बदल नाही) ---
 class EmaCrossWithCandleStop(bt.Strategy):
     params = (('fast_ema', 9), ('slow_ema', 20))
-    
     def __init__(self):
         self.fast_ema = bt.indicators.EMA(self.data.close, period=self.params.fast_ema)
         self.slow_ema = bt.indicators.EMA(self.data.close, period=self.params.slow_ema)
         self.crossover = bt.indicators.CrossOver(self.fast_ema, self.slow_ema)
-        self.stop_loss_order = None
-        self.signal_candle_low = None
-
+        self.stop_loss_order = None; self.signal_candle_low = None
     def notify_order(self, order):
         if order.status in [order.Completed, order.Canceled, order.Margin]:
-            if order.exectype == bt.Order.Stop:
-                self.stop_loss_order = None
-
+            if order.exectype == bt.Order.Stop: self.stop_loss_order = None
     def next(self):
         if not self.position:
-            if self.crossover > 0:
-                self.buy()
-                self.signal_candle_low = self.data.low[0]
+            if self.crossover > 0: self.buy(); self.signal_candle_low = self.data.low[0]
         else:
             if self.stop_loss_order is None:
                 self.stop_loss_order = self.sell(exectype=bt.Order.Stop, price=self.signal_candle_low)
             if self.crossover < 0:
-                if self.stop_loss_order:
-                    self.cancel(self.stop_loss_order)
+                if self.stop_loss_order: self.cancel(self.stop_loss_order)
                 self.close()
 
-# --- Strategy 2: RSI ---
 class RSIStrategy(bt.Strategy):
     params = (('rsi_period', 14), ('oversold', 30), ('overbought', 70))
-    
-    def __init__(self):
-        self.rsi = bt.indicators.RSI(self.data.close, period=self.params.rsi_period)
-        
+    def __init__(self): self.rsi = bt.indicators.RSI(self.data.close, period=self.params.rsi_period)
     def next(self):
         if not self.position:
-            if self.rsi < self.params.oversold:
-                self.buy()
+            if self.rsi < self.params.oversold: self.buy()
         else:
-            if self.rsi > self.params.overbought:
-                self.close()
+            if self.rsi > self.params.overbought: self.close()
 
-# --- Strategy 3: Golden Cross ---
 class GoldenCrossStrategy(bt.Strategy):
     params = (('fast_sma', 50), ('slow_sma', 200))
-    
     def __init__(self):
         fast_sma = bt.indicators.SMA(self.data.close, period=self.params.fast_sma)
         slow_sma = bt.indicators.SMA(self.data.close, period=self.params.slow_sma)
         self.crossover = bt.indicators.CrossOver(fast_sma, slow_sma)
-        
     def next(self):
         if not self.position:
-            if self.crossover > 0:
-                self.buy()
-        elif self.crossover < 0:
-            self.close()
+            if self.crossover > 0: self.buy()
+        elif self.crossover < 0: self.close()
 
-# --- Main Application Logic ---
 STRATEGIES = {
     'ema_cross': (EmaCrossWithCandleStop, "EMA Crossover (9/20)"),
     'rsi_strategy': (RSIStrategy, "RSI Strategy (Oversold/Overbought)"),
@@ -140,6 +121,31 @@ def backtest():
                                timeframe=timeframe_display_name, initial_cap=f'{initial_capital:,.2f}',
                                final_cap=f'{final_capital:,.2f}', pnl=f'{pnl:,.2f}',
                                chart_html=chart_html)
-    except Exception as e:
-        print(f"एक अनपेक्षित एरर आला: {e}")
-        return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे: {e}</p>"
+    except Exception:
+        # --- हा सर्वात महत्त्वाचा बदल आहे ---
+        # हा कोड आपल्याला खरा आणि सविस्तर एरर दाखवेल
+        error_details = traceback.format_exc()
+        print("----------- DETAILED ERROR -----------")
+        print(error_details)
+        print("------------------------------------")
+        return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे. कृपया काही वेळाने पुन्हा प्रयत्न करा.</p>"
+
+```
+
+### **पायरी २: तुमचा कोड GitHub वर अपडेट करा**
+
+आता हा अंतिम बदल तुमच्या GitHub पेजवर पाठवा.
+
+1.  तुमच्या `MyWebApp` फोल्डरमध्ये **टर्मिनल (PowerShell)** उघडा.
+2.  आता खालील **तीनही कमांड्स याच क्रमाने** चालवा:
+
+    ```bash
+    git add .
+    ```
+    ```bash
+    git commit -m "अंतिम उपाय: खरा एरर शोधण्यासाठी Traceback जोडला"
+    ```
+    ```bash
+    git push
+    
+
