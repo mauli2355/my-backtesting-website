@@ -4,16 +4,27 @@
     <meta charset="UTF-8">
     <title>Backtesting Agent</title>
     <style>
-        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-        input[type=text] { padding: 10px; font-size: 16px; }
-        input[type=submit] { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        body { font-family: sans-serif; text-align: center; margin-top: 50px; background: #0d1117; color: white; }
+        input, select { padding: 10px; font-size: 16px; margin: 10px; }
+        input[type=submit] { cursor: pointer; background: limegreen; border: none; color: white; }
     </style>
 </head>
 <body>
-    <h1>Stock Market Backtesting Agent</h1>
-    <p>तुमच्या स्ट्रॅटेजीची चाचणी घेण्यासाठी स्टॉकचे नाव टाका (उदा. RELIANCE.NS)</p>
+    <h1>📈 Stock Market Backtesting Agent</h1>
+    <p>स्टॉकचे नाव व टाइमफ्रेम निवडा:</p>
     <form action="/backtest" method="post">
-        <input type="text" name="stock_name" required>
+        <input type="text" name="stock_name" placeholder="उदा. RELIANCE.NS" required>
+        <select name="timeframe">
+            <option value="1m">1 Minute</option>
+            <option value="5m">5 Minutes</option>
+            <option value="15m">15 Minutes</option>
+            <option value="30m">30 Minutes</option>
+            <option value="1h">1 Hour</option>
+            <option value="4h">4 Hours</option>
+            <option value="1d" selected>1 Day</option>
+            <option value="1w">1 Week</option>
+            <option value="1mo">1 Month</option>
+        </select>
         <input type="submit" value="Backtest सुरू करा">
     </form>
 </body>

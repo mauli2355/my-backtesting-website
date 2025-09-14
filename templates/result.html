@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <title>Backtesting Result</title>
     <style>
-        body { font-family: sans-serif; text-align: center; }
-        .result { border: 1px solid #ccc; padding: 20px; margin: 20px auto; max-width: 800px; }
+        body { font-family: sans-serif; text-align: center; background: #0d1117; color: white; }
+        .result { border: 1px solid #444; padding: 20px; margin: 20px auto; max-width: 800px; background: #161b22; }
+        a { color: cyan; }
     </style>
 </head>
 <body>
-    <h1>{{ stock }} साठी बॅकटेस्टिंग निकाल</h1>
+    <h1>{{ stock }} ({{ timeframe }}) साठी बॅकटेस्टिंग निकाल</h1>
     <div class="result">
         <h3>सुरुवातीचे भांडवल: ₹{{ initial_cap }}</h3>
         <h3>अंतिम भांडवल: ₹{{ final_cap }}</h3>
@@ -20,6 +21,6 @@
         {{ chart_html | safe }}
     </div>
     <br><br>
-    <a href="/">नवीन बॅकटेस्ट करा</a>
+    <a href="/">🔄 नवीन बॅकटेस्ट करा</a>
 </body>
 </html>

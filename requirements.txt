@@ -1,5 +1,4 @@
 Flask
-matplotlib
 backtrader
 yfinance
 gunicorn
