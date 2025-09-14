@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Backtesting Result</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; }
+        .result { border: 1px solid #ccc; padding: 20px; margin: 20px auto; max-width: 800px; }
+        img { max-width: 100%; height: auto; }
+    </style>
+</head>
+<body>
+    <h1>{{ stock }} साठी बॅकटेस्टिंग निकाल</h1>
+    <div class="result">
+        <h3>सुरुवातीचे भांडवल: ₹{{ initial_cap }}</h3>
+        <h3>अंतिम भांडवल: ₹{{ final_cap }}</h3>
+        <h2>एकूण नफा/तोटा: ₹{{ pnl }}</h2>
+    </div>
+    <h2>बॅकटेस्टिंग चार्ट</h2>
+    <img src="/static/plot.png?v={{ random_int }}" alt="Backtesting Chart">
+    <br><br>
+    <a href="/">नवीन बॅकटेस्ट करा</a>
+</body>
+</html>

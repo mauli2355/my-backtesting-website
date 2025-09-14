@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Backtesting Agent</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+        input[type=text] { padding: 10px; font-size: 16px; }
+        input[type=submit] { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Stock Market Backtesting Agent</h1>
+    <p>तुमच्या स्ट्रॅटेजीची चाचणी घेण्यासाठी स्टॉकचे नाव टाका (उदा. RELIANCE.NS)</p>
+    <form action="/backtest" method="post">
+        <input type="text" name="stock_name" required>
+        <input type="submit" value="Backtest सुरू करा">
+    </form>
+</body>
+</html>
