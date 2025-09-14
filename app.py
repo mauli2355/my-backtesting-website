@@ -1,6 +1,8 @@
 # app.py
 
 from flask import Flask, render_template, request
+import matplotlib
+matplotlib.use('Agg')
 import backtrader as bt
 import yfinance as yf
 from datetime import datetime
