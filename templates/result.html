@@ -2,23 +2,26 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Backtesting Result</title>
+    <title>Backtest Result</title>
     <style>
-        body { font-family: sans-serif; text-align: center; }
-        .result { border: 1px solid #ccc; padding: 20px; margin: 20px auto; max-width: 800px; }
-        img { max-width: 100%; height: auto; }
+        body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; }
+        .container { background: white; padding: 30px; margin: 20px auto; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 900px; }
+        img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 20px; }
+        a { text-decoration: none; color: #5c67f2; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h1>{{ stock }} साठी बॅकटेस्टिंग निकाल</h1>
-    <div class="result">
-        <h3>सुरुवातीचे भांडवल: ₹{{ initial_cap }}</h3>
-        <h3>अंतिम भांडवल: ₹{{ final_cap }}</h3>
-        <h2>एकूण नफा/तोटा: ₹{{ pnl }}</h2>
+    <div class="container">
+        <h1>{{ stock }} Backtest Result</h1>
+        <p><b>Initial Capital:</b> ₹{{ initial_cap }}</p>
+        <p><b>Final Capital:</b> ₹{{ final_cap }}</p>
+        <h2>PnL: ₹{{ pnl }}</h2>
+
+        <h3>Chart</h3>
+        <img src="/static/plot.png?v={{ random_int }}" alt="Backtest Chart">
+
+        <br><br>
+        <a href="/">⬅ परत जा</a>
     </div>
-    <h2>बॅकटेस्टिंग चार्ट</h2>
-    <img src="/static/plot.png?v={{ random_int }}" alt="Backtesting Chart">
-    <br><br>
-    <a href="/">नवीन बॅकटेस्ट करा</a>
 </body>
 </html>

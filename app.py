@@ -1,19 +1,17 @@
 # app.py
 
 import matplotlib
-matplotlib.use('Agg') # महत्वाचा बदल
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
 from datetime import datetime
 import random
-import traceback # <-- एरर शोधण्यासाठी नवीन लायब्ररी
 
-# Flask ॲप सुरू करणे
 app = Flask(__name__)
 
-# --- तुमचा बॅकटेस्टिंगचा कोड (स्ट्रॅटेजी) ---
 class EmaCrossWithCandleStop(bt.Strategy):
     params = (('fast_ema', 9), ('slow_ema', 20))
     def __init__(self):
@@ -37,7 +35,6 @@ class EmaCrossWithCandleStop(bt.Strategy):
             if self.crossover < 0:
                 if self.stop_loss_order: self.cancel(self.stop_loss_order)
                 self.close()
-# --- स्ट्रॅटेजीचा कोड समाप्त ---
 
 @app.route('/')
 def index():
@@ -69,7 +66,9 @@ def backtest():
         pnl = final_capital - initial_capital
 
         plot_path = 'static/plot.png'
-        cerebro.plot(style='candlestick', barup='green', bardown='red', iplot=False, savefig=True, figpath=plot_path)
+        figs = cerebro.plot(style='candlestick', barup='green', bardown='red', iplot=False)
+        figs[0][0].savefig(plot_path, dpi=300, bbox_inches='tight')
+        plt.close('all')
 
         return render_template('result.html', 
                                stock=stock_name,
@@ -79,13 +78,5 @@ def backtest():
                                random_int=random.randint(1,1000)
                                )
     except Exception as e:
-        # --- हा सर्वात महत्वाचा बदल आहे ---
-        # हा कोड Render च्या Logs मध्ये संपूर्ण एरर दाखवेल
-        error_details = traceback.format_exc()
-        print("----------- DETAILED ERROR -----------")
-        print(error_details)
-        print("------------------------------------")
-        
-        # आणि युझरला एक सोपा मेसेज दाखवेल
-        return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे. कृपया काही वेळाने पुन्हा प्रयत्न करा.</p><p>Error Details: {e}</p>"
-
+        print(f"एक अनपेक्षित एरर आला: {e}")
+        return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे: {e}</p>"
