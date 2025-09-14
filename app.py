@@ -7,7 +7,8 @@ from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
 from datetime import datetime
-import random # To prevent image caching
+import random
+import traceback # <-- एरर शोधण्यासाठी नवीन लायब्ररी
 
 # Flask ॲप सुरू करणे
 app = Flask(__name__)
@@ -44,44 +45,47 @@ def index():
 
 @app.route('/backtest', methods=['POST'])
 def backtest():
-    stock_name = request.form['stock_name']
-    
-    initial_capital = 100000.0
-    from_date = datetime(2021, 1, 1)
-    to_date = datetime.now()
-    
-    # --- नवीन आणि सुधारित कोड (Error Handling) ---
     try:
-        # डेटा डाउनलोड करण्याचा प्रयत्न करणे
+        stock_name = request.form['stock_name']
+        initial_capital = 100000.0
+        from_date = datetime(2021, 1, 1)
+        to_date = datetime.now()
+        
         data_df = yf.Ticker(stock_name).history(start=from_date, end=to_date)
         
-        # जर डेटा मिळाला नाही, तर एरर देणे
         if data_df.empty:
-            return f"<h1>Error</h1><p>'{stock_name}' साठी कोणताही डेटा सापडला नाही. कृपया स्टॉकचे नाव (उदा. RELIANCE.NS) तपासा आणि पुन्हा प्रयत्न करा.</p><a href='/'>परत जा</a>"
+            return f"<h1>Error</h1><p>'{stock_name}' साठी कोणताही डेटा सापडला नाही. कृपया स्टॉकचे नाव तपासा.</p><a href='/'>परत जा</a>"
             
         data = bt.feeds.PandasData(dataname=data_df)
+
+        cerebro = bt.Cerebro()
+        cerebro.broker.setcash(initial_capital)
+        cerebro.adddata(data)
+        cerebro.addstrategy(EmaCrossWithCandleStop)
+        cerebro.broker.setcommission(commission=0.002)
+        cerebro.run()
+        
+        final_capital = cerebro.broker.getvalue()
+        pnl = final_capital - initial_capital
+
+        plot_path = 'static/plot.png'
+        cerebro.plot(style='candlestick', barup='green', bardown='red', iplot=False, savefig=True, figpath=plot_path)
+
+        return render_template('result.html', 
+                               stock=stock_name,
+                               initial_cap=f'{initial_capital:,.2f}',
+                               final_cap=f'{final_capital:,.2f}',
+                               pnl=f'{pnl:,.2f}',
+                               random_int=random.randint(1,1000)
+                               )
     except Exception as e:
-        # इतर कोणताही एरर आल्यास, तो दाखवणे
-        return f"<h1>Error</h1><p>डेटा मिळवताना एरर आला: {e}</p><a href='/'>परत जा</a>"
-    # --- एरर हँडलिंग समाप्त ---
+        # --- हा सर्वात महत्वाचा बदल आहे ---
+        # हा कोड Render च्या Logs मध्ये संपूर्ण एरर दाखवेल
+        error_details = traceback.format_exc()
+        print("----------- DETAILED ERROR -----------")
+        print(error_details)
+        print("------------------------------------")
+        
+        # आणि युझरला एक सोपा मेसेज दाखवेल
+        return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे. कृपया काही वेळाने पुन्हा प्रयत्न करा.</p><p>Error Details: {e}</p>"
 
-    cerebro = bt.Cerebro()
-    cerebro.broker.setcash(initial_capital)
-    cerebro.adddata(data)
-    cerebro.addstrategy(EmaCrossWithCandleStop)
-    cerebro.broker.setcommission(commission=0.002)
-    cerebro.run()
-    
-    final_capital = cerebro.broker.getvalue()
-    pnl = final_capital - initial_capital
-
-    plot_path = 'static/plot.png'
-    cerebro.plot(style='candlestick', barup='green', bardown='red', iplot=False, savefig=True, figpath=plot_path)
-
-    return render_template('result.html', 
-                           stock=stock_name,
-                           initial_cap=f'{initial_capital:,.2f}',
-                           final_cap=f'{final_capital:,.2f}',
-                           pnl=f'{pnl:,.2f}',
-                           random_int=random.randint(1,1000)
-                           )
