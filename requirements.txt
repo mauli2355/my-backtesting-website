@@ -3,3 +3,5 @@ matplotlib
 backtrader
 yfinance
 gunicorn
+plotly
+pandas

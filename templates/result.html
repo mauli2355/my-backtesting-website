@@ -3,22 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <title>Backtest Result</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         body { font-family: sans-serif; text-align: center; background-color: #f4f4f9; }
-        .container { background: white; padding: 30px; margin: 20px auto; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 900px; }
-        img { max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; margin-top: 20px; }
+        h1, h2 { color: #333; }
+        .result-container { background: white; padding: 30px; margin: 20px auto; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-width: 90%; }
         a { text-decoration: none; color: #5c67f2; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="result-container">
         <h1>{{ stock }} Backtest Result</h1>
+        <h2>Strategy: {{ strategy_name }} | Timeframe: {{ timeframe }}</h2>
         <p><b>Initial Capital:</b> ₹{{ initial_cap }}</p>
         <p><b>Final Capital:</b> ₹{{ final_cap }}</p>
         <h2>PnL: ₹{{ pnl }}</h2>
 
-        <h3>Chart</h3>
-        <img src="/static/plot.png?v={{ random_int }}" alt="Backtest Chart">
+        <h3>Interactive Chart</h3>
+        <div id="chart">{{ chart_html | safe }}</div>
 
         <br><br>
         <a href="/">⬅ परत जा</a>
