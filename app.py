@@ -1,8 +1,9 @@
 # app.py
 
-from flask import Flask, render_template, request
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('Agg') # महत्वाचा बदल
+
+from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
 from datetime import datetime
@@ -11,7 +12,7 @@ import random # To prevent image caching
 # Flask ॲप सुरू करणे
 app = Flask(__name__)
 
-# --- तुमचा बॅकटेस्टिंगचा कोड (स्ट्रॅटेजी) येथे कॉपी करा ---
+# --- तुमचा बॅकटेस्टिंगचा कोड (स्ट्रॅटेजी) ---
 class EmaCrossWithCandleStop(bt.Strategy):
     params = (('fast_ema', 9), ('slow_ema', 20))
     def __init__(self):
@@ -39,44 +40,48 @@ class EmaCrossWithCandleStop(bt.Strategy):
 
 @app.route('/')
 def index():
-    # मुख्य पेज दाखवणे
     return render_template('index.html')
 
 @app.route('/backtest', methods=['POST'])
 def backtest():
-    # वेब फॉर्ममधून स्टॉकचे नाव घेणे
     stock_name = request.form['stock_name']
     
-    cerebro = bt.Cerebro()
     initial_capital = 100000.0
-    cerebro.broker.setcash(initial_capital)
-    
     from_date = datetime(2021, 1, 1)
     to_date = datetime.now()
     
-    data = bt.feeds.PandasData(dataname=yf.Ticker(stock_name).history(start=from_date, end=to_date))
+    # --- नवीन आणि सुधारित कोड (Error Handling) ---
+    try:
+        # डेटा डाउनलोड करण्याचा प्रयत्न करणे
+        data_df = yf.Ticker(stock_name).history(start=from_date, end=to_date)
+        
+        # जर डेटा मिळाला नाही, तर एरर देणे
+        if data_df.empty:
+            return f"<h1>Error</h1><p>'{stock_name}' साठी कोणताही डेटा सापडला नाही. कृपया स्टॉकचे नाव (उदा. RELIANCE.NS) तपासा आणि पुन्हा प्रयत्न करा.</p><a href='/'>परत जा</a>"
+            
+        data = bt.feeds.PandasData(dataname=data_df)
+    except Exception as e:
+        # इतर कोणताही एरर आल्यास, तो दाखवणे
+        return f"<h1>Error</h1><p>डेटा मिळवताना एरर आला: {e}</p><a href='/'>परत जा</a>"
+    # --- एरर हँडलिंग समाप्त ---
 
+    cerebro = bt.Cerebro()
+    cerebro.broker.setcash(initial_capital)
     cerebro.adddata(data)
     cerebro.addstrategy(EmaCrossWithCandleStop)
     cerebro.broker.setcommission(commission=0.002)
-
-    # बॅकटेस्टिंग चालवणे
     cerebro.run()
     
     final_capital = cerebro.broker.getvalue()
     pnl = final_capital - initial_capital
 
-    # महत्वाचा बदल: चार्टला वेबसाईटवर दाखवण्यासाठी सेव्ह करणे
-    # iplot=False हे आवश्यक आहे कारण सर्व्हरवर चार्ट आपोआप उघडू शकत नाही
     plot_path = 'static/plot.png'
     cerebro.plot(style='candlestick', barup='green', bardown='red', iplot=False, savefig=True, figpath=plot_path)
 
-    # निकाल result.html पेजवर पाठवणे
     return render_template('result.html', 
                            stock=stock_name,
                            initial_cap=f'{initial_capital:,.2f}',
                            final_cap=f'{final_capital:,.2f}',
                            pnl=f'{pnl:,.2f}',
-                           random_int=random.randint(1,1000) # For cache busting
+                           random_int=random.randint(1,1000)
                            )
-
