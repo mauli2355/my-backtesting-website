@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
-from datetime import datetime
+from datetime import datetime, timedelta
 import plotly.graph_objs as go
 import pandas as pd
 
@@ -31,7 +31,6 @@ class EmaCross(bt.Strategy):
                 self.sell()
                 self.signals.append(("SELL", dt, price))
 
-
 # =====================
 # ROUTES
 # =====================
@@ -54,22 +53,31 @@ def backtest():
         interval = tf_map.get(timeframe, "1d")
 
         initial_capital = 100000.0
-        from_date = datetime(2023, 1, 1)
-        to_date = datetime.now()
 
-        # डेटा डाउनलोड करा
+        # 1m,5m डेटा फार जुना मिळत नाही, म्हणून from_date recent ठेवा
+        to_date = datetime.now()
+        if interval in ["1m", "5m", "15m", "30m", "60m", "240m"]:
+            from_date = to_date - timedelta(days=60)  # मागील 2 महिन्यांचा डेटा
+        else:
+            from_date = datetime(2023, 1, 1)  # लांब काळासाठी
+
+        # डेटा डाउनलोड
         data_df = yf.download(stock_name, start=from_date, end=to_date, interval=interval)
         if data_df.empty:
             return f"<h1>Error</h1><p>'{stock_name}' साठी डेटा सापडला नाही.</p><a href='/'>परत जा</a>"
 
-        # Backtrader साठी डेटा तयार करा
+        # Backtrader setup
         data = bt.feeds.PandasData(dataname=data_df)
         cerebro = bt.Cerebro()
         cerebro.broker.setcash(initial_capital)
         cerebro.addstrategy(EmaCross)
-        strategies = cerebro.run()  # run() चे परतलेले list capture करा
-        signals = strategies[0].signals
+        strategies = cerebro.run()
 
+        # सुरक्षित तपासणी
+        if not strategies:
+            return "<h1>Error</h1><p>Strategy run करता आला नाही, डेटा खूप कमी आहे.</p><a href='/'>परत जा</a>"
+
+        signals = strategies[0].signals
         final_capital = cerebro.broker.getvalue()
         pnl = final_capital - initial_capital
 
