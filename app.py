@@ -20,14 +20,16 @@ class EmaCross(bt.Strategy):
         self.signals = []
 
     def next(self):
+        dt = self.data.datetime.datetime(0)  # अचूक datetime
+        price = self.data.close[0]
         if not self.position:
             if self.crossover > 0:  # BUY
                 self.buy()
-                self.signals.append(("BUY", self.data.datetime.date(0), self.data.close[0]))
+                self.signals.append(("BUY", dt, price))
         else:
             if self.crossover < 0:  # SELL
                 self.sell()
-                self.signals.append(("SELL", self.data.datetime.date(0), self.data.close[0]))
+                self.signals.append(("SELL", dt, price))
 
 
 # =====================
@@ -44,7 +46,7 @@ def backtest():
         stock_name = request.form['stock_name']
         timeframe = request.form['timeframe']
 
-        # Map TradingView-style intervals to yfinance
+        # TradingView-style interval → yfinance mapping
         tf_map = {
             "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
             "1h": "60m", "4h": "240m", "1d": "1d", "1w": "1wk", "1mo": "1mo"
@@ -55,24 +57,23 @@ def backtest():
         from_date = datetime(2023, 1, 1)
         to_date = datetime.now()
 
-        # Download data
+        # डेटा डाउनलोड करा
         data_df = yf.download(stock_name, start=from_date, end=to_date, interval=interval)
-
         if data_df.empty:
             return f"<h1>Error</h1><p>'{stock_name}' साठी डेटा सापडला नाही.</p><a href='/'>परत जा</a>"
 
-        # Backtrader
+        # Backtrader साठी डेटा तयार करा
         data = bt.feeds.PandasData(dataname=data_df)
         cerebro = bt.Cerebro()
         cerebro.broker.setcash(initial_capital)
-        strategy = cerebro.addstrategy(EmaCross)
-        cerebro.run()
-        signals = strategy[0].signals
+        cerebro.addstrategy(EmaCross)
+        strategies = cerebro.run()  # run() चे परतलेले list capture करा
+        signals = strategies[0].signals
 
         final_capital = cerebro.broker.getvalue()
         pnl = final_capital - initial_capital
 
-        # Plotly Chart
+        # Plotly चार्ट
         fig = go.Figure(data=[go.Candlestick(
             x=data_df.index,
             open=data_df['Open'],
@@ -82,7 +83,7 @@ def backtest():
             name="Candles"
         )])
 
-        # Add EMA lines
+        # EMA जोडणे
         data_df['EMA9'] = data_df['Close'].ewm(span=9, adjust=False).mean()
         data_df['EMA20'] = data_df['Close'].ewm(span=20, adjust=False).mean()
 
@@ -91,7 +92,7 @@ def backtest():
         fig.add_trace(go.Scatter(x=data_df.index, y=data_df['EMA20'], mode='lines',
                                  name='EMA 20', line=dict(color='orange')))
 
-        # Add Buy/Sell markers
+        # Buy/Sell मार्कर्स
         buy_signals = [s for s in signals if s[0] == "BUY"]
         sell_signals = [s for s in signals if s[0] == "SELL"]
 
