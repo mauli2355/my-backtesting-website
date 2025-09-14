@@ -70,19 +70,28 @@ def index():
 @app.route('/backtest', methods=['POST'])
 def backtest():
     try:
-        stock_name = request.form['stock_name']
-        selected_strategy_key = request.form['strategy']
-        timeframe = request.form['timeframe']
-        
+        # --- माहिती मिळवण्याचा सुरक्षित मार्ग ---
+        stock_name = request.form.get('stock_name')
+        selected_strategy_key = request.form.get('strategy')
+        timeframe = request.form.get('timeframe')
+
+        # --- माहिती तपासणे ---
+        if not all([stock_name, selected_strategy_key, timeframe]):
+            return "<h1>Error</h1><p>सर्व माहिती (स्टॉक, स्ट्रॅटेजी, टाइमफ्रेम) भरणे आवश्यक आहे.</p><a href='/'>परत जा</a>"
+
         StrategyClass, strategy_display_name = STRATEGIES.get(selected_strategy_key)
         timeframe_display_name = TIMEFRAMES.get(timeframe)
-
+        if not StrategyClass:
+            return "<h1>Error</h1><p>अवैध स्ट्रॅटेजी निवडली.</p><a href='/'>परत जा</a>"
+        
+        # --- बॅकटेस्टिंग प्रक्रिया ---
         initial_capital = 100000.0
         from_date = datetime(2021, 1, 1)
         to_date = datetime.now()
         
         data_df = yf.Ticker(stock_name).history(start=from_date, end=to_date, interval=timeframe)
-        if data_df.empty: return f"<h1>Error</h1><p>'{stock_name}' साठी डेटा सापडला नाही.</p>"
+        if data_df.empty: 
+            return f"<h1>Error</h1><p>'{stock_name}' साठी डेटा सापडला नाही. कृपया स्टॉकचे नाव (उदा. RELIANCE.NS) तपासा.</p><a href='/'>परत जा</a>"
         
         data = bt.feeds.PandasData(dataname=data_df)
         cerebro = bt.Cerebro()
@@ -90,10 +99,7 @@ def backtest():
         cerebro.adddata(data)
         cerebro.addstrategy(StrategyClass)
         cerebro.broker.setcommission(commission=0.002)
-        
-        # Analyzer जोडणे जेणेकरून आपल्याला ट्रेड्सची माहिती मिळेल
         cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trade_analyzer')
-        
         results = cerebro.run()
         
         final_capital = cerebro.broker.getvalue()
@@ -101,16 +107,20 @@ def backtest():
 
         # --- Plotly वापरून इंटरॅक्टिव्ह चार्ट तयार करणे ---
         fig = go.Figure()
-        # Candlestick चार्ट
         fig.add_trace(go.Candlestick(x=data_df.index, open=data_df['Open'], high=data_df['High'], low=data_df['Low'], close=data_df['Close'], name='Price'))
         
-        # ट्रेड ॲनालिसिसमधून खरेदी-विक्रीचे पॉइंट्स मिळवणे
         trade_analysis = results[0].analyzers.trade_analyzer.get_analysis()
-        buy_dates = [trade.open_datetime() for trade in trade_analysis.values() if trade.is_open and trade.pnl > 0 or not trade.is_open]
+        buy_dates = [trade.open_datetime() for trade in trade_analysis.values()]
         sell_dates = [trade.close_datetime() for trade in trade_analysis.values() if not trade.is_open]
+        
+        # Ensure dates are in dataframe index before trying to access them
+        buy_dates_in_df = [d for d in buy_dates if d in data_df.index]
+        sell_dates_in_df = [d for d in sell_dates if d in data_df.index]
 
-        fig.add_trace(go.Scatter(x=buy_dates, y=data_df['Low'].loc[buy_dates] * 0.98, mode='markers', marker=dict(color='green', size=10, symbol='triangle-up'), name='Buy'))
-        fig.add_trace(go.Scatter(x=sell_dates, y=data_df['High'].loc[sell_dates] * 1.02, mode='markers', marker=dict(color='red', size=10, symbol='triangle-down'), name='Sell'))
+        if buy_dates_in_df:
+            fig.add_trace(go.Scatter(x=buy_dates_in_df, y=data_df.loc[buy_dates_in_df]['Low'] * 0.98, mode='markers', marker=dict(color='green', size=10, symbol='triangle-up'), name='Buy'))
+        if sell_dates_in_df:
+            fig.add_trace(go.Scatter(x=sell_dates_in_df, y=data_df.loc[sell_dates_in_df]['High'] * 1.02, mode='markers', marker=dict(color='red', size=10, symbol='triangle-down'), name='Sell'))
         
         fig.update_layout(title=f'{stock_name} - {strategy_display_name}', xaxis_title='Date', yaxis_title='Price', xaxis_rangeslider_visible=True)
         chart_html = fig.to_html(full_html=False)
@@ -127,3 +137,22 @@ def backtest():
     except Exception as e:
         print(f"एक अनपेक्षित एरर आला: {e}")
         return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे: {e}</p>"
+```
+
+### **पायरी २: तुमचा कोड GitHub वर अपडेट करा**
+
+आता हा अंतिम बदल तुमच्या GitHub पेजवर पाठवा.
+
+1.  तुमच्या `MyWebApp` फोल्डरमध्ये **टर्मिनल (PowerShell)** उघडा.
+2.  आता खालील **तीनही कमांड्स याच क्रमाने** चालवा:
+
+    ```bash
+    git add .
+    ```
+    ```bash
+    git commit -m "अंतिम उपाय: 400 Bad Request एरर दुरुस्त केला"
+    ```
+    ```bash
+    git push
+    
+
