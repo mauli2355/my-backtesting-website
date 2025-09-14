@@ -1,5 +1,9 @@
 # app.py
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
@@ -102,7 +106,7 @@ def backtest():
         if data_df.empty: 
             return f"<h1>Error</h1><p>'{stock_name}' साठी डेटा सापडला नाही.</p><a href='/'>परत जा</a>"
         
-        data = bt.feeds.PandasData(dataname=data_df)
+        data = bt.feeds.PandasData(datancd ..me=data_df)
         cerebro = bt.Cerebro()
         cerebro.broker.setcash(initial_capital)
         cerebro.adddata(data)
