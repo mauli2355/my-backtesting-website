@@ -1,10 +1,6 @@
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Matplotlib backend setting Agg for headless servers
-import matplotlib
-matplotlib.use('Agg')
-
 def create_plot(data_df, trade_analysis, stock_name, strategy_name):
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                         vertical_spacing=0.05, subplot_titles=(f'{stock_name} Chart', 'Volume'), 
@@ -16,10 +12,7 @@ def create_plot(data_df, trade_analysis, stock_name, strategy_name):
 
     fig.add_trace(go.Bar(x=data_df.index, y=data_df['Volume'], name='Volume'), row=2, col=1)
 
-    # --- ✅ हा आहे अंतिम आणि अचूक उपाय ---
     buy_dates, sell_dates = [], []
-    
-    # आपण आता फक्त 'trades' नावाच्या ड्रॉवरमध्येच शोधणार आहोत
     if trade_analysis and 'trades' in trade_analysis:
         for trade_id, trade_data in trade_analysis['trades'].items():
             if trade_data and 'dtopen' in trade_data:
