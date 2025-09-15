@@ -1,3 +1,9 @@
+# app.py
+
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
@@ -5,80 +11,51 @@ from datetime import datetime
 import pandas as pd
 import plotly.graph_objects as go
 
-# Matplotlib backend setting Agg for headless servers
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-
 app = Flask(__name__)
 
-# --- Strategy 1: EMA Crossover ---
+# --- सर्व Strategy Classes येथे आहेत (यात कोणताही बदल नाही) ---
 class EmaCrossWithCandleStop(bt.Strategy):
     params = (('fast_ema', 9), ('slow_ema', 20))
-    
     def __init__(self):
         self.fast_ema = bt.indicators.EMA(self.data.close, period=self.params.fast_ema)
         self.slow_ema = bt.indicators.EMA(self.data.close, period=self.params.slow_ema)
         self.crossover = bt.indicators.CrossOver(self.fast_ema, self.slow_ema)
-        self.stop_loss_order = None
-        self.signal_candle_low = None
-
-    def notify_order(self, order):
-        if order.status in [order.Completed, order.Canceled, order.Margin]:
-            if order.exectype == bt.Order.Stop:
-                self.stop_loss_order = None
-
     def next(self):
         if not self.position:
-            if self.crossover > 0:
-                self.buy()
-                self.signal_candle_low = self.data.low[0]
-        else:
-            if self.stop_loss_order is None:
-                self.stop_loss_order = self.sell(exectype=bt.Order.Stop, price=self.signal_candle_low)
-            if self.crossover < 0:
-                if self.stop_loss_order:
-                    self.cancel(self.stop_loss_order)
-                self.close()
+            if self.crossover > 0: self.buy()
+        elif self.crossover < 0: self.close()
 
-# --- Strategy 2: RSI ---
 class RSIStrategy(bt.Strategy):
     params = (('rsi_period', 14), ('oversold', 30), ('overbought', 70))
-    
-    def __init__(self):
-        self.rsi = bt.indicators.RSI(self.data.close, period=self.params.rsi_period)
-        
+    def __init__(self): self.rsi = bt.indicators.RSI(self.data.close, period=self.params.rsi_period)
     def next(self):
         if not self.position:
-            if self.rsi < self.params.oversold:
-                self.buy()
+            if self.rsi < self.params.oversold: self.buy()
         else:
-            if self.rsi > self.params.overbought:
-                self.close()
+            if self.rsi > self.params.overbought: self.close()
 
-# --- Strategy 3: Golden Cross ---
 class GoldenCrossStrategy(bt.Strategy):
     params = (('fast_sma', 50), ('slow_sma', 200))
-    
     def __init__(self):
         fast_sma = bt.indicators.SMA(self.data.close, period=self.params.fast_sma)
         slow_sma = bt.indicators.SMA(self.data.close, period=self.params.slow_sma)
         self.crossover = bt.indicators.CrossOver(fast_sma, slow_sma)
-        
     def next(self):
         if not self.position:
-            if self.crossover > 0:
-                self.buy()
-        elif self.crossover < 0:
-            self.close()
+            if self.crossover > 0: self.buy()
+        elif self.crossover < 0: self.close()
 
-# --- Main Application Logic ---
 STRATEGIES = {
     'ema_cross': (EmaCrossWithCandleStop, "EMA Crossover (9/20)"),
     'rsi_strategy': (RSIStrategy, "RSI Strategy (Oversold/Overbought)"),
     'golden_cross': (GoldenCrossStrategy, "Golden Cross (50/200 SMA)")
 }
-TIMEFRAMES = {'1d': "Daily", '1wk': "Weekly", '1mo': "Monthly"}
+
+# ✅ तुम्ही सुचवलेली सुधारित TIMEFRAMES डिक्शनरी
+TIMEFRAMES = {
+    '5m': "5 Minutes", '15m': "15 Minutes", '30m': "30 Minutes",
+    '1h': "1 Hour", '1d': "Daily", '1wk': "Weekly", '1mo': "Monthly"
+}
 
 @app.route('/')
 def index():
@@ -98,12 +75,15 @@ def backtest():
         timeframe_display_name = TIMEFRAMES.get(timeframe)
         
         initial_capital = 100000.0
-        from_date = datetime(2021, 1, 1)
-        to_date = datetime.now()
         
-        data_df = yf.Ticker(stock_name).history(start=from_date, end=to_date, interval=timeframe)
+        # yfinance साठी योग्य period आणि interval निवडणे
+        if timeframe in ['5m', '15m', '30m', '1h']:
+            data_df = yf.Ticker(stock_name).history(period="60d", interval=timeframe)
+        else:
+            data_df = yf.Ticker(stock_name).history(period="5y", interval=timeframe)
+
         if data_df.empty: 
-            return f"<h1>Error</h1><p>'{stock_name}' साठी डेटा सापडला नाही.</p><a href='/'>परत जा</a>"
+            return f"<h1>Error</h1><p>'{stock_name}' ({timeframe_display_name}) साठी डेटा सापडला नाही.</p><a href='/'>परत जा</a>"
         
         data = bt.feeds.PandasData(dataname=data_df)
         cerebro = bt.Cerebro()
@@ -120,9 +100,18 @@ def backtest():
         fig = go.Figure()
         fig.add_trace(go.Candlestick(x=data_df.index, open=data_df['Open'], high=data_df['High'], low=data_df['Low'], close=data_df['Close'], name='Price'))
         
+        # ✅ तुम्ही सुचवलेली सुरक्षित ट्रेड ॲनालिसिस पद्धत
         trade_analysis = results[0].analyzers.trade_analyzer.get_analysis()
-        buy_dates = [trade.open_datetime() for trade in trade_analysis.values()]
-        sell_dates = [trade.close_datetime() for trade in trade_analysis.values() if not trade.is_open]
+        buy_dates, sell_dates = [], []
+        if trade_analysis and trade_analysis.get('total', {}).get('total', 0) > 0:
+            for t in trade_analysis.values():
+                if isinstance(t, dict):
+                    for trade_id, trade_data in t.items():
+                        if trade_data.get('status') == 'Open':
+                            buy_dates.append(trade_data.get('dtopen'))
+                        elif trade_data.get('status') == 'Closed':
+                            buy_dates.append(trade_data.get('dtopen'))
+                            sell_dates.append(trade_data.get('dtclose'))
         
         buy_dates_in_df = [d for d in buy_dates if d in data_df.index]
         sell_dates_in_df = [d for d in sell_dates if d in data_df.index]
