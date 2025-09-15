@@ -2,5 +2,6 @@ Flask
 backtrader
 yfinance
 gunicorn
+matplotlib
 plotly
 pandas
