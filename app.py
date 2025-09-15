@@ -1,15 +1,16 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request
 import yfinance as yf
 from datetime import datetime
 import backtrader as bt
 import traceback
+import os
 
+# आपल्या इतर Python फाईल्समधून आवश्यक गोष्टी इम्पोर्ट करणे
 from strategies import STRATEGIES
 from backtesting_engine import run_backtest
 from plotting import create_plot
 
 app = Flask(__name__)
-app.secret_key = 'your_super_secret_key_here' # सेशन वापरण्यासाठी सीक्रेट की आवश्यक
 
 TIMEFRAMES = {
     '5m': "5 Minutes", '15m': "15 Minutes", '30m': "30 Minutes",
@@ -28,7 +29,7 @@ def backtest():
         timeframe = request.form.get('timeframe')
 
         if not all([stock_name, selected_strategy_key, timeframe]):
-            return "<h1>Error</h1><p>सर्व माहिती भरणे आवश्यक आहे.</p>"
+            return "<h1>Error</h1><p>सर्व माहिती (स्टॉक, स्ट्रॅटेजी, टाइमफ्रेम) भरणे आवश्यक आहे.</p>"
 
         StrategyClass, strategy_display_name = STRATEGIES.get(selected_strategy_key)
         timeframe_display_name = TIMEFRAMES.get(timeframe)
@@ -54,39 +55,23 @@ def backtest():
         buy_signals = strategy_instance.buy_signals
         sell_signals = strategy_instance.sell_signals
         
+        # --- ✅ हा आहे अंतिम आणि अचूक उपाय ---
+        # आपण आता चार्टला session मध्ये सेव्ह करण्याऐवजी थेट एका तात्पुरत्या HTML फाईलमध्ये सेव्ह करत आहोत.
         chart_html = create_plot(data_df, buy_signals, sell_signals, stock_name, strategy_display_name)
-
-        # माहिती session मध्ये सेव्ह करा आणि चार्ट पेजवर रिडायरेक्ट करा
-        session['result_data'] = {
-            'stock': stock_name,
-            'strategy_name': strategy_display_name,
-            'timeframe': timeframe_display_name,
-            'initial_cap': f'{initial_capital:,.2f}',
-            'final_cap': f'{final_capital:,.2f}',
-            'pnl': f'{pnl:,.2f}',
-            'chart_html': chart_html,
-            'trend_analysis': trend_analysis,
-            'pnl_numeric': pnl # pnl_numeric देखील जोडा
-        }
-        return redirect(url_for('show_chart'))
-
+        
+        # इतर सर्व माहिती result.html कडे पाठवणे
+        return render_template('result.html', 
+                               stock=stock_name, 
+                               strategy_name=strategy_display_name,
+                               timeframe=timeframe_display_name, 
+                               initial_cap=f'{initial_capital:,.2f}',
+                               final_cap=f'{final_capital:,.2f}', 
+                               pnl=f'{pnl:,.2f}',
+                               pnl_numeric=pnl,
+                               trend_analysis=trend_analysis,
+                               chart_html=chart_html
+                               )
     except Exception as e:
         error_details = traceback.format_exc()
         print(f"----------- DETAILED ERROR -----------\n{error_details}------------------------------------")
         return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे: {e}</p>"
-
-@app.route('/chart')
-def show_chart():
-    result_data = session.get('result_data')
-    if not result_data:
-        return redirect(url_for('index')) # डेटा नसेल तर होम पेजवर परत पाठवा
-
-    return render_template('chart_page.html', **result_data)
-
-@app.route('/results_summary')
-def show_results_summary():
-    result_data = session.get('result_data')
-    if not result_data:
-        return redirect(url_for('index')) # डेटा नसेल तर होम पेजवर परत पाठवा
-        
-    return render_template('results_summary_page.html', **result_data)
