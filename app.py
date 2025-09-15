@@ -1,39 +1,85 @@
 from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
-import plotly.graph_objects as go
-import pandas as pd
 from datetime import datetime
+import pandas as pd
+import plotly.graph_objects as go
+
+# Matplotlib backend setting Agg for headless servers
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 
-# =====================
-# STRATEGY
-# =====================
-class EmaCross(bt.Strategy):
-    params = (('fast_ema', 9), ('slow_ema', 20),)
-
+# --- Strategy 1: EMA Crossover ---
+class EmaCrossWithCandleStop(bt.Strategy):
+    params = (('fast_ema', 9), ('slow_ema', 20))
+    
     def __init__(self):
         self.fast_ema = bt.indicators.EMA(self.data.close, period=self.params.fast_ema)
         self.slow_ema = bt.indicators.EMA(self.data.close, period=self.params.slow_ema)
         self.crossover = bt.indicators.CrossOver(self.fast_ema, self.slow_ema)
-        self.signals = []
+        self.stop_loss_order = None
+        self.signal_candle_low = None
+
+    def notify_order(self, order):
+        if order.status in [order.Completed, order.Canceled, order.Margin]:
+            if order.exectype == bt.Order.Stop:
+                self.stop_loss_order = None
 
     def next(self):
-        dt = self.data.datetime.datetime(0)
-        price = self.data.close[0]
         if not self.position:
-            if self.crossover > 0:  # BUY
+            if self.crossover > 0:
                 self.buy()
-                self.signals.append(("BUY", dt, price))
+                self.signal_candle_low = self.data.low[0]
         else:
-            if self.crossover < 0:  # SELL
-                self.sell()
-                self.signals.append(("SELL", dt, price))
+            if self.stop_loss_order is None:
+                self.stop_loss_order = self.sell(exectype=bt.Order.Stop, price=self.signal_candle_low)
+            if self.crossover < 0:
+                if self.stop_loss_order:
+                    self.cancel(self.stop_loss_order)
+                self.close()
 
-# =====================
-# ROUTES
-# =====================
+# --- Strategy 2: RSI ---
+class RSIStrategy(bt.Strategy):
+    params = (('rsi_period', 14), ('oversold', 30), ('overbought', 70))
+    
+    def __init__(self):
+        self.rsi = bt.indicators.RSI(self.data.close, period=self.params.rsi_period)
+        
+    def next(self):
+        if not self.position:
+            if self.rsi < self.params.oversold:
+                self.buy()
+        else:
+            if self.rsi > self.params.overbought:
+                self.close()
+
+# --- Strategy 3: Golden Cross ---
+class GoldenCrossStrategy(bt.Strategy):
+    params = (('fast_sma', 50), ('slow_sma', 200))
+    
+    def __init__(self):
+        fast_sma = bt.indicators.SMA(self.data.close, period=self.params.fast_sma)
+        slow_sma = bt.indicators.SMA(self.data.close, period=self.params.slow_sma)
+        self.crossover = bt.indicators.CrossOver(fast_sma, slow_sma)
+        
+    def next(self):
+        if not self.position:
+            if self.crossover > 0:
+                self.buy()
+        elif self.crossover < 0:
+            self.close()
+
+# --- Main Application Logic ---
+STRATEGIES = {
+    'ema_cross': (EmaCrossWithCandleStop, "EMA Crossover (9/20)"),
+    'rsi_strategy': (RSIStrategy, "RSI Strategy (Oversold/Overbought)"),
+    'golden_cross': (GoldenCrossStrategy, "Golden Cross (50/200 SMA)")
+}
+TIMEFRAMES = {'1d': "Daily", '1wk': "Weekly", '1mo': "Monthly"}
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -42,97 +88,58 @@ def index():
 def backtest():
     try:
         stock_name = request.form.get('stock_name')
-        # ✅ आपण HTML मधून multiple strategies आणि timeframe काढून टाकले आहेत,
-        # त्यामुळे हा कोड सध्या फक्त एका स्ट्रॅटेजीसाठी काम करेल.
-        timeframe = "1d" # सध्या फक्त डेली टाइमफ्रेम
+        selected_strategy_key = request.form.get('strategy')
+        timeframe = request.form.get('timeframe')
 
+        if not all([stock_name, selected_strategy_key, timeframe]):
+            return "<h1>Error</h1><p>सर्व माहिती भरणे आवश्यक आहे.</p><a href='/'>परत जा</a>"
+
+        StrategyClass, strategy_display_name = STRATEGIES.get(selected_strategy_key)
+        timeframe_display_name = TIMEFRAMES.get(timeframe)
+        
         initial_capital = 100000.0
-
-        # 📌 Safe data download
-        try:
-            # ✅ जास्त डेटा मिळवण्यासाठी आपण start date वापरू
-            data_df = yf.download(stock_name, start="2021-01-01", interval=timeframe, progress=False, threads=False)
-        except Exception as yf_err:
-            return f"<h1>Yahoo Finance Error</h1><p>डेटा मिळाला नाही: {yf_err}</p><a href='/'>परत जा</a>"
-
-        # 📌 Check if enough candles
-        if data_df.empty or len(data_df) < 50:
-            return f"<h1>Error</h1><p>'{stock_name}' ({timeframe}) साठी पुरेसा डेटा सापडला नाही. कृपया timeframe बदलून पाहा.</p><a href='/'>परत जा</a>"
-
-        # Backtrader setup
+        from_date = datetime(2021, 1, 1)
+        to_date = datetime.now()
+        
+        data_df = yf.Ticker(stock_name).history(start=from_date, end=to_date, interval=timeframe)
+        if data_df.empty: 
+            return f"<h1>Error</h1><p>'{stock_name}' साठी डेटा सापडला नाही.</p><a href='/'>परत जा</a>"
+        
         data = bt.feeds.PandasData(dataname=data_df)
         cerebro = bt.Cerebro()
         cerebro.broker.setcash(initial_capital)
-        
-        # ✅ Cerebro मध्ये डेटा जोडला (सर्वात महत्त्वाची दुरुस्ती)
         cerebro.adddata(data)
-        
-        cerebro.addstrategy(EmaCross)
-        
-        # ✅ cerebro.run() एका लिस्टमध्ये स्ट्रॅटेजी परत करते
+        cerebro.addstrategy(StrategyClass)
+        cerebro.broker.setcommission(commission=0.002)
+        cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trade_analyzer')
         results = cerebro.run()
-        strategy_instance = results[0] # पहिली स्ट्रॅटेजी मिळवणे
-
-        signals = strategy_instance.signals
+        
         final_capital = cerebro.broker.getvalue()
         pnl = final_capital - initial_capital
 
-        # =====================
-        # Plotly चार्ट
-        # =====================
-        fig = go.Figure(data=[go.Candlestick(
-            x=data_df.index,
-            open=data_df['Open'],
-            high=data_df['High'],
-            low=data_df['Low'],
-            close=data_df['Close'],
-            name="Candles"
-        )])
+        fig = go.Figure()
+        fig.add_trace(go.Candlestick(x=data_df.index, open=data_df['Open'], high=data_df['High'], low=data_df['Low'], close=data_df['Close'], name='Price'))
+        
+        trade_analysis = results[0].analyzers.trade_analyzer.get_analysis()
+        buy_dates = [trade.open_datetime() for trade in trade_analysis.values()]
+        sell_dates = [trade.close_datetime() for trade in trade_analysis.values() if not trade.is_open]
+        
+        buy_dates_in_df = [d for d in buy_dates if d in data_df.index]
+        sell_dates_in_df = [d for d in sell_dates if d in data_df.index]
 
-        data_df['EMA9'] = data_df['Close'].ewm(span=9, adjust=False).mean()
-        data_df['EMA20'] = data_df['Close'].ewm(span=20, adjust=False).mean()
-        fig.add_trace(go.Scatter(x=data_df.index, y=data_df['EMA9'], mode='lines', name='EMA 9', line=dict(color='cyan')))
-        fig.add_trace(go.Scatter(x=data_df.index, y=data_df['EMA20'], mode='lines', name='EMA 20', line=dict(color='orange')))
-
-        buy_signals = [s for s in signals if s[0] == "BUY"]
-        sell_signals = [s for s in signals if s[0] == "SELL"]
-
-        fig.add_trace(go.Scatter(x=[s[1] for s in buy_signals], y=[s[2] for s in buy_signals], mode="markers", marker=dict(symbol="triangle-up", color="lime", size=12), name="BUY Signal"))
-        fig.add_trace(go.Scatter(x=[s[1] for s in sell_signals], y=[s[2] for s in sell_signals], mode="markers", marker=dict(symbol="triangle-down", color="red", size=12), name="SELL Signal"))
-
-        fig.update_layout(title=f"{stock_name} ({timeframe}) EMA Crossover Backtest", xaxis_rangeslider_visible=False, template="plotly_dark", height=700)
+        if buy_dates_in_df:
+            fig.add_trace(go.Scatter(x=buy_dates_in_df, y=data_df.loc[buy_dates_in_df]['Low'] * 0.98, mode='markers', marker=dict(color='green', size=10, symbol='triangle-up'), name='Buy'))
+        if sell_dates_in_df:
+            fig.add_trace(go.Scatter(x=sell_dates_in_df, y=data_df.loc[sell_dates_in_df]['High'] * 1.02, mode='markers', marker=dict(color='red', size=10, symbol='triangle-down'), name='Sell'))
+        
+        fig.update_layout(title=f'{stock_name} - {strategy_display_name}', xaxis_title='Date', yaxis_title='Price', xaxis_rangeslider_visible=True)
         chart_html = fig.to_html(full_html=False)
 
-        return render_template('result.html',
-                               stock=stock_name,
-                               timeframe=timeframe,
-                               initial_cap=f'{initial_capital:,.2f}',
-                               final_cap=f'{final_capital:,.2f}',
-                               pnl=f'{pnl:,.2f}',
+        return render_template('result.html', 
+                               stock=stock_name, strategy_name=strategy_display_name,
+                               timeframe=timeframe_display_name, initial_cap=f'{initial_capital:,.2f}',
+                               final_cap=f'{final_capital:,.2f}', pnl=f'{pnl:,.2f}',
                                chart_html=chart_html)
-
     except Exception as e:
-        print(f"Error: {e}")
-        return f"<h1>Application Error</h1><p>{e}</p>"
-
-# टीप: हा कोड तुमच्या जुन्या index.html आणि result.html सोबत काम करेल.
-# फक्त खात्री करा की index.html मध्ये 'timeframe' आणि 'strategy' चे ड्रॉप-डाउन नाहीत.
-```
-
-### **पायरी २: तुमचा कोड GitHub वर अपडेट करा**
-
-आता हा अंतिम बदल तुमच्या GitHub पेजवर पाठवा.
-
-1.  तुमच्या `MyWebApp` फोल्डरमध्ये **टर्मिनल (PowerShell)** उघडा.
-2.  आता खालील **तीनही कमांड्स याच क्रमाने** चालवा:
-
-    ```bash
-    git add .
-    ```
-    ```bash
-    git commit -m "अंतिम उपाय: Backtrader डेटा एरर दुरुस्त केला"
-    ```
-    ```bash
-    git push
-    
-
+        print(f"एक अनपेक्षित एरर आला: {e}")
+        return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे: {e}</p>"
