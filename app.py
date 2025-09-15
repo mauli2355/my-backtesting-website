@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
-import plotly.graph_objs as go
+import plotly.graph_objects as go
+import pandas as pd
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -36,41 +38,20 @@ class EmaCross(bt.Strategy):
 def index():
     return render_template('index.html')
 
-
 @app.route('/backtest', methods=['POST'])
 def backtest():
     try:
-        stock_name = request.form['stock_name']
-        timeframe = request.form['timeframe']
-
-        # TradingView-style interval → yfinance mapping
-        tf_map = {
-            "1m": "1m",
-            "5m": "5m",
-            "15m": "15m",
-            "30m": "30m",
-            "1h": "60m",
-            "4h": "4h",
-            "1d": "1d",
-            "1w": "1wk",
-            "1mo": "1mo"
-        }
-        interval = tf_map.get(timeframe, "1d")
+        stock_name = request.form.get('stock_name')
+        # ✅ आपण HTML मधून multiple strategies आणि timeframe काढून टाकले आहेत,
+        # त्यामुळे हा कोड सध्या फक्त एका स्ट्रॅटेजीसाठी काम करेल.
+        timeframe = "1d" # सध्या फक्त डेली टाइमफ्रेम
 
         initial_capital = 100000.0
 
         # 📌 Safe data download
         try:
-            if interval == "1m":
-                data_df = yf.download(stock_name, period="7d", interval=interval, progress=False, threads=False)
-            elif interval in ["5m", "15m", "30m", "60m", "90m", "1h", "4h"]:
-                data_df = yf.download(stock_name, period="60d", interval=interval, progress=False, threads=False)
-                # fallback if 4h empty
-                if data_df.empty and interval == "4h":
-                    data_df = yf.download(stock_name, period="60d", interval="60m", progress=False, threads=False)
-                    timeframe = "1h (fallback from 4h)"
-            else:
-                data_df = yf.download(stock_name, start="2023-01-01", interval=interval, progress=False, threads=False)
+            # ✅ जास्त डेटा मिळवण्यासाठी आपण start date वापरू
+            data_df = yf.download(stock_name, start="2021-01-01", interval=timeframe, progress=False, threads=False)
         except Exception as yf_err:
             return f"<h1>Yahoo Finance Error</h1><p>डेटा मिळाला नाही: {yf_err}</p><a href='/'>परत जा</a>"
 
@@ -82,13 +63,17 @@ def backtest():
         data = bt.feeds.PandasData(dataname=data_df)
         cerebro = bt.Cerebro()
         cerebro.broker.setcash(initial_capital)
+        
+        # ✅ Cerebro मध्ये डेटा जोडला (सर्वात महत्त्वाची दुरुस्ती)
+        cerebro.adddata(data)
+        
         cerebro.addstrategy(EmaCross)
-        strategies = cerebro.run()
+        
+        # ✅ cerebro.run() एका लिस्टमध्ये स्ट्रॅटेजी परत करते
+        results = cerebro.run()
+        strategy_instance = results[0] # पहिली स्ट्रॅटेजी मिळवणे
 
-        if not strategies:
-            return "<h1>Error</h1><p>Strategy run करता आला नाही, डेटा खूप कमी आहे.</p><a href='/'>परत जा</a>"
-
-        signals = strategies[0].signals
+        signals = strategy_instance.signals
         final_capital = cerebro.broker.getvalue()
         pnl = final_capital - initial_capital
 
@@ -104,46 +89,18 @@ def backtest():
             name="Candles"
         )])
 
-        # EMA जोडणे
         data_df['EMA9'] = data_df['Close'].ewm(span=9, adjust=False).mean()
         data_df['EMA20'] = data_df['Close'].ewm(span=20, adjust=False).mean()
+        fig.add_trace(go.Scatter(x=data_df.index, y=data_df['EMA9'], mode='lines', name='EMA 9', line=dict(color='cyan')))
+        fig.add_trace(go.Scatter(x=data_df.index, y=data_df['EMA20'], mode='lines', name='EMA 20', line=dict(color='orange')))
 
-        fig.add_trace(go.Scatter(x=data_df.index, y=data_df['EMA9'], mode='lines',
-                                 name='EMA 9', line=dict(color='cyan')))
-        fig.add_trace(go.Scatter(x=data_df.index, y=data_df['EMA20'], mode='lines',
-                                 name='EMA 20', line=dict(color='orange')))
-
-        # Buy/Sell markers
         buy_signals = [s for s in signals if s[0] == "BUY"]
         sell_signals = [s for s in signals if s[0] == "SELL"]
 
-        fig.add_trace(go.Scatter(
-            x=[s[1] for s in buy_signals],
-            y=[s[2] for s in buy_signals],
-            mode="markers",
-            marker=dict(symbol="triangle-up", color="lime", size=12),
-            name="BUY Signal"
-        ))
+        fig.add_trace(go.Scatter(x=[s[1] for s in buy_signals], y=[s[2] for s in buy_signals], mode="markers", marker=dict(symbol="triangle-up", color="lime", size=12), name="BUY Signal"))
+        fig.add_trace(go.Scatter(x=[s[1] for s in sell_signals], y=[s[2] for s in sell_signals], mode="markers", marker=dict(symbol="triangle-down", color="red", size=12), name="SELL Signal"))
 
-        fig.add_trace(go.Scatter(
-            x=[s[1] for s in sell_signals],
-            y=[s[2] for s in sell_signals],
-            mode="markers",
-            marker=dict(symbol="triangle-down", color="red", size=12),
-            name="SELL Signal"
-        ))
-
-        # Layout
-        fig.update_layout(
-            title=f"{stock_name} ({timeframe}) EMA Crossover Backtest",
-            xaxis_rangeslider_visible=False,
-            template="plotly_dark",
-            height=700,
-            plot_bgcolor="#0d1117",
-            paper_bgcolor="#0d1117",
-            font=dict(color="white")
-        )
-
+        fig.update_layout(title=f"{stock_name} ({timeframe}) EMA Crossover Backtest", xaxis_rangeslider_visible=False, template="plotly_dark", height=700)
         chart_html = fig.to_html(full_html=False)
 
         return render_template('result.html',
@@ -152,12 +109,30 @@ def backtest():
                                initial_cap=f'{initial_capital:,.2f}',
                                final_cap=f'{final_capital:,.2f}',
                                pnl=f'{pnl:,.2f}',
-                               chart_html=chart_html
-                               )
+                               chart_html=chart_html)
 
     except Exception as e:
         print(f"Error: {e}")
         return f"<h1>Application Error</h1><p>{e}</p>"
 
-if __name__ == "__main__":
-    app.run(debug=True)
+# टीप: हा कोड तुमच्या जुन्या index.html आणि result.html सोबत काम करेल.
+# फक्त खात्री करा की index.html मध्ये 'timeframe' आणि 'strategy' चे ड्रॉप-डाउन नाहीत.
+```
+
+### **पायरी २: तुमचा कोड GitHub वर अपडेट करा**
+
+आता हा अंतिम बदल तुमच्या GitHub पेजवर पाठवा.
+
+1.  तुमच्या `MyWebApp` फोल्डरमध्ये **टर्मिनल (PowerShell)** उघडा.
+2.  आता खालील **तीनही कमांड्स याच क्रमाने** चालवा:
+
+    ```bash
+    git add .
+    ```
+    ```bash
+    git commit -m "अंतिम उपाय: Backtrader डेटा एरर दुरुस्त केला"
+    ```
+    ```bash
+    git push
+    
+
