@@ -51,7 +51,7 @@ def backtest():
             "15m": "15m",
             "30m": "30m",
             "1h": "60m",
-            "4h": "4h",   # ✅ FIXED (Yahoo supports '4h')
+            "4h": "4h",   # Yahoo supports directly
             "1d": "1d",
             "1w": "1wk",
             "1mo": "1mo"
@@ -60,16 +60,21 @@ def backtest():
 
         initial_capital = 100000.0
 
-        # 📌 yfinance period handling
+        # 📌 Download data with proper period
         if interval == "1m":
             data_df = yf.download(stock_name, period="7d", interval=interval)
         elif interval in ["5m", "15m", "30m", "60m", "90m", "1h", "4h"]:
             data_df = yf.download(stock_name, period="60d", interval=interval)
+            # fallback if 4h empty
+            if data_df.empty and interval == "4h":
+                data_df = yf.download(stock_name, period="60d", interval="60m")
+                timeframe = "1h (fallback from 4h)"
         else:
             data_df = yf.download(stock_name, start="2023-01-01", interval=interval)
 
-        if data_df.empty:
-            return f"<h1>Error</h1><p>'{stock_name}' साठी डेटा सापडला नाही.</p><a href='/'>परत जा</a>"
+        # 📌 Check if enough candles
+        if data_df.empty or len(data_df) < 50:
+            return f"<h1>Error</h1><p>'{stock_name}' ({timeframe}) साठी पुरेसा डेटा सापडला नाही. कृपया timeframe बदलून पाहा.</p><a href='/'>परत जा</a>"
 
         # Backtrader setup
         data = bt.feeds.PandasData(dataname=data_df)
