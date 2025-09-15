@@ -1,15 +1,15 @@
-# app.py
-
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-
 from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
 from datetime import datetime
 import pandas as pd
 import plotly.graph_objects as go
+import traceback
+
+# Matplotlib backend setting Agg for headless servers
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 
@@ -50,8 +50,6 @@ STRATEGIES = {
     'rsi_strategy': (RSIStrategy, "RSI Strategy (Oversold/Overbought)"),
     'golden_cross': (GoldenCrossStrategy, "Golden Cross (50/200 SMA)")
 }
-
-# ✅ तुम्ही सुचवलेली सुधारित TIMEFRAMES डिक्शनरी
 TIMEFRAMES = {
     '5m': "5 Minutes", '15m': "15 Minutes", '30m': "30 Minutes",
     '1h': "1 Hour", '1d': "Daily", '1wk': "Weekly", '1mo': "Monthly"
@@ -76,7 +74,6 @@ def backtest():
         
         initial_capital = 100000.0
         
-        # yfinance साठी योग्य period आणि interval निवडणे
         if timeframe in ['5m', '15m', '30m', '1h']:
             data_df = yf.Ticker(stock_name).history(period="60d", interval=timeframe)
         else:
@@ -100,18 +97,17 @@ def backtest():
         fig = go.Figure()
         fig.add_trace(go.Candlestick(x=data_df.index, open=data_df['Open'], high=data_df['High'], low=data_df['Low'], close=data_df['Close'], name='Price'))
         
-        # ✅ तुम्ही सुचवलेली सुरक्षित ट्रेड ॲनालिसिस पद्धत
+        # --- ✅ हा आहे अंतिम आणि अचूक उपाय ---
         trade_analysis = results[0].analyzers.trade_analyzer.get_analysis()
         buy_dates, sell_dates = [], []
-        if trade_analysis and trade_analysis.get('total', {}).get('total', 0) > 0:
-            for t in trade_analysis.values():
-                if isinstance(t, dict):
-                    for trade_id, trade_data in t.items():
-                        if trade_data.get('status') == 'Open':
-                            buy_dates.append(trade_data.get('dtopen'))
-                        elif trade_data.get('status') == 'Closed':
-                            buy_dates.append(trade_data.get('dtopen'))
-                            sell_dates.append(trade_data.get('dtclose'))
+        
+        # आपण आता फक्त 'trades' नावाच्या ड्रॉवरमध्येच शोधणार आहोत
+        if trade_analysis and 'trades' in trade_analysis:
+            for trade_id, trade_data in trade_analysis['trades'].items():
+                if trade_data and 'dtopen' in trade_data:
+                    buy_dates.append(trade_data['dtopen'])
+                if trade_data and trade_data.get('status') == 'Closed' and 'dtclose' in trade_data:
+                    sell_dates.append(trade_data['dtclose'])
         
         buy_dates_in_df = [d for d in buy_dates if d in data_df.index]
         sell_dates_in_df = [d for d in sell_dates if d in data_df.index]
@@ -129,6 +125,9 @@ def backtest():
                                timeframe=timeframe_display_name, initial_cap=f'{initial_capital:,.2f}',
                                final_cap=f'{final_capital:,.2f}', pnl=f'{pnl:,.2f}',
                                chart_html=chart_html)
-    except Exception as e:
-        print(f"एक अनपेक्षित एरर आला: {e}")
-        return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे: {e}</p>"
+    except Exception:
+        error_details = traceback.format_exc()
+        print("----------- DETAILED ERROR -----------")
+        print(error_details)
+        print("------------------------------------")
+        return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे. कृपया काही वेळाने पुन्हा प्रयत्न करा.</p>"
