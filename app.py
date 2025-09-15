@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
-from datetime import datetime
 import plotly.graph_objs as go
 
 app = Flask(__name__)
@@ -51,7 +50,7 @@ def backtest():
             "15m": "15m",
             "30m": "30m",
             "1h": "60m",
-            "4h": "4h",   # Yahoo supports directly
+            "4h": "4h",
             "1d": "1d",
             "1w": "1wk",
             "1mo": "1mo"
@@ -60,17 +59,20 @@ def backtest():
 
         initial_capital = 100000.0
 
-        # 📌 Download data with proper period
-        if interval == "1m":
-            data_df = yf.download(stock_name, period="7d", interval=interval)
-        elif interval in ["5m", "15m", "30m", "60m", "90m", "1h", "4h"]:
-            data_df = yf.download(stock_name, period="60d", interval=interval)
-            # fallback if 4h empty
-            if data_df.empty and interval == "4h":
-                data_df = yf.download(stock_name, period="60d", interval="60m")
-                timeframe = "1h (fallback from 4h)"
-        else:
-            data_df = yf.download(stock_name, start="2023-01-01", interval=interval)
+        # 📌 Safe data download
+        try:
+            if interval == "1m":
+                data_df = yf.download(stock_name, period="7d", interval=interval, progress=False, threads=False)
+            elif interval in ["5m", "15m", "30m", "60m", "90m", "1h", "4h"]:
+                data_df = yf.download(stock_name, period="60d", interval=interval, progress=False, threads=False)
+                # fallback if 4h empty
+                if data_df.empty and interval == "4h":
+                    data_df = yf.download(stock_name, period="60d", interval="60m", progress=False, threads=False)
+                    timeframe = "1h (fallback from 4h)"
+            else:
+                data_df = yf.download(stock_name, start="2023-01-01", interval=interval, progress=False, threads=False)
+        except Exception as yf_err:
+            return f"<h1>Yahoo Finance Error</h1><p>डेटा मिळाला नाही: {yf_err}</p><a href='/'>परत जा</a>"
 
         # 📌 Check if enough candles
         if data_df.empty or len(data_df) < 50:
@@ -156,7 +158,6 @@ def backtest():
     except Exception as e:
         print(f"Error: {e}")
         return f"<h1>Application Error</h1><p>{e}</p>"
-
 
 if __name__ == "__main__":
     app.run(debug=True)
