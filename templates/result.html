@@ -2,25 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Backtesting Result</title>
+    <title>Backtest Result</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #0d1117; color: white; }
-        .result { border: 1px solid #444; padding: 20px; margin: 20px auto; max-width: 800px; background: #161b22; }
-        a { color: cyan; }
+        /* CSS code from previous response */
     </style>
 </head>
 <body>
-    <h1>{{ stock }} ({{ timeframe }}) साठी बॅकटेस्टिंग निकाल</h1>
-    <div class="result">
-        <h3>सुरुवातीचे भांडवल: ₹{{ initial_cap }}</h3>
-        <h3>अंतिम भांडवल: ₹{{ final_cap }}</h3>
-        <h2>एकूण नफा/तोटा: ₹{{ pnl }}</h2>
-    </div>
-    <h2>बॅकटेस्टिंग चार्ट</h2>
-    <div>
-        {{ chart_html | safe }}
-    </div>
-    <br><br>
-    <a href="/">🔄 नवीन बॅकटेस्ट करा</a>
-</body>
+    </body>
 </html>
