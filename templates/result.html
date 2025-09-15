@@ -4,10 +4,78 @@
     <meta charset="UTF-8">
     <title>Backtest Result</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* CSS code from previous response */
+        body { font-family: 'Inter', sans-serif; margin: 0; background-color: #1a1a2e; color: #e0e0e0; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 300px; background-color: #16213e; padding: 25px; display: flex; flex-direction: column; border-right: 1px solid #2a3b5a; }
+        .main-content { flex-grow: 1; padding: 25px; overflow-y: auto; text-align: center; }
+        .sidebar h1 { font-size: 24px; color: #e94560; margin: 0 0 40px 0; text-align: center; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; text-align: left; color: #a7c5eb; }
+        input[type="text"], select { width: 100%; padding: 12px; font-size: 16px; border: 1px solid #536976; border-radius: 5px; background-color: #1f4068; color: #e0e0e0; box-sizing: border-box; }
+        .run-button { width: 100%; padding: 15px; font-size: 18px; font-weight: bold; cursor: pointer; background-color: #e94560; color: white; border: none; border-radius: 5px; margin-top: auto; }
+        .run-button:hover { background-color: #c43751; }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left; padding: 20px; background-color: #16213e; border-radius: 8px; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #536976; padding: 8px; }
+        th { background-color: #1f4068; }
     </style>
 </head>
 <body>
-    </body>
+    <div class="sidebar">
+        <h1>AI Backtester</h1>
+        <form action="/backtest" method="post">
+            <div class="form-group">
+                <label for="stock_name">Stock Symbol</label>
+                <input type="text" id="stock_name" name="stock_name" value="{{ stock }}" required>
+            </div>
+            <div class="form-group">
+                <label for="strategy">Select Strategy</label>
+                <select id="strategy" name="strategy" required>
+                     <option value="ema_cross" {% if strategy_name == 'EMA Crossover (9/20)' %}selected{% endif %}>EMA Crossover (9/20)</option>
+                    <option value="rsi_strategy" {% if strategy_name == 'RSI Strategy (Oversold/Overbought)' %}selected{% endif %}>RSI Strategy</option>
+                    <option value="golden_cross" {% if strategy_name == 'Golden Cross (50/200 SMA)' %}selected{% endif %}>Golden Cross (50/200 SMA)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="timeframe">Select Timeframe</label>
+                <select id="timeframe" name="timeframe" required>
+                    <option value="1d" {% if timeframe == 'Daily' %}selected{% endif %}>Daily</option>
+                    <option value="1wk" {% if timeframe == 'Weekly' %}selected{% endif %}>Weekly</option>
+                    <option value="1mo" {% if timeframe == 'Monthly' %}selected{% endif %}>Monthly</option>
+                    <option value="1h" {% if timeframe == '1 Hour' %}selected{% endif %}>1 Hour</option>
+                    <option value="30m" {% if timeframe == '30 Minutes' %}selected{% endif %}>30 Minutes</option>
+                    <option value="15m" {% if timeframe == '15 Minutes' %}selected{% endif %}>15 Minutes</option>
+                    <option value="5m" {% if timeframe == '5 Minutes' %}selected{% endif %}>5 Minutes</option>
+                </select>
+            </div>
+            <button type="submit" class="run-button">Run Again</button>
+        </form>
+    </div>
+    <div class="main-content">
+        <h1>{{ stock }} Backtest Result</h1>
+        <h2>Strategy: {{ strategy_name }} | Timeframe: {{ timeframe }}</h2>
+        
+        <div class="grid-container">
+            <div>
+                <h3>Overall Performance</h3>
+                <p><b>Initial Capital:</b> ₹{{ initial_cap }}</p>
+                <p><b>Final Capital:</b> ₹{{ final_cap }}</p>
+                <h2>PnL: ₹{{ pnl }}</h2>
+            </div>
+            <div>
+                <h3>Trend-based Performance</h3>
+                <table>
+                    <tr><th>Trend</th><th>Total Trades</th><th>Total PnL</th></tr>
+                    <tr><td>Uptrend</td><td>{{ trend_analysis.uptrend.trades }}</td><td>₹{{ "%.2f"|format(trend_analysis.uptrend.pnl) }}</td></tr>
+                    <tr><td>Downtrend</td><td>{{ trend_analysis.downtrend.trades }}</td><td>₹{{ "%.2f"|format(trend_analysis.downtrend.pnl) }}</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <h3>Interactive Chart</h3>
+        <div id="chart">{{ chart_html | safe }}</div>
+        <br>
+    </div>
+</body>
 </html>
