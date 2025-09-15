@@ -1,9 +1,8 @@
 from flask import Flask, render_template, request
 import backtrader as bt
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime
 import plotly.graph_objs as go
-import pandas as pd
 
 app = Flask(__name__)
 
@@ -20,7 +19,7 @@ class EmaCross(bt.Strategy):
         self.signals = []
 
     def next(self):
-        dt = self.data.datetime.datetime(0)  # अचूक datetime
+        dt = self.data.datetime.datetime(0)
         price = self.data.close[0]
         if not self.position:
             if self.crossover > 0:  # BUY
@@ -54,15 +53,14 @@ def backtest():
 
         initial_capital = 100000.0
 
-        # 1m,5m डेटा फार जुना मिळत नाही, म्हणून from_date recent ठेवा
-        to_date = datetime.now()
-        if interval in ["1m", "5m", "15m", "30m", "60m", "240m"]:
-            from_date = to_date - timedelta(days=60)  # मागील 2 महिन्यांचा डेटा
+        # 📌 yfinance period handling
+        if interval == "1m":
+            data_df = yf.download(stock_name, period="7d", interval=interval)
+        elif interval in ["5m", "15m", "30m", "60m", "240m"]:
+            data_df = yf.download(stock_name, period="60d", interval=interval)
         else:
-            from_date = datetime(2023, 1, 1)  # लांब काळासाठी
+            data_df = yf.download(stock_name, start="2023-01-01", interval=interval)
 
-        # डेटा डाउनलोड
-        data_df = yf.download(stock_name, start=from_date, end=to_date, interval=interval)
         if data_df.empty:
             return f"<h1>Error</h1><p>'{stock_name}' साठी डेटा सापडला नाही.</p><a href='/'>परत जा</a>"
 
@@ -73,7 +71,6 @@ def backtest():
         cerebro.addstrategy(EmaCross)
         strategies = cerebro.run()
 
-        # सुरक्षित तपासणी
         if not strategies:
             return "<h1>Error</h1><p>Strategy run करता आला नाही, डेटा खूप कमी आहे.</p><a href='/'>परत जा</a>"
 
@@ -81,7 +78,9 @@ def backtest():
         final_capital = cerebro.broker.getvalue()
         pnl = final_capital - initial_capital
 
+        # =====================
         # Plotly चार्ट
+        # =====================
         fig = go.Figure(data=[go.Candlestick(
             x=data_df.index,
             open=data_df['Open'],
@@ -100,7 +99,7 @@ def backtest():
         fig.add_trace(go.Scatter(x=data_df.index, y=data_df['EMA20'], mode='lines',
                                  name='EMA 20', line=dict(color='orange')))
 
-        # Buy/Sell मार्कर्स
+        # Buy/Sell markers
         buy_signals = [s for s in signals if s[0] == "BUY"]
         sell_signals = [s for s in signals if s[0] == "SELL"]
 
