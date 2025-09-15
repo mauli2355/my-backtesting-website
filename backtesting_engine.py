@@ -1,5 +1,6 @@
 import backtrader as bt
-# ... (TrendAnalyzer कोड जसाच्या तसा आहे) ...
+
+# TrendAnalyzer मध्ये कोणताही बदल नाही
 class TrendAnalyzer(bt.Analyzer):
     def __init__(self):
         self.sma = bt.indicators.SMA(self.data, period=200)
@@ -18,17 +19,22 @@ def run_backtest(data, strategy_class, initial_capital):
     cerebro.broker.setcash(initial_capital)
     cerebro.adddata(data)
     
-    # स्ट्रॅटेजीचा इंस्टन्स मिळवणे
-    strategy_instance = cerebro.addstrategy(strategy_class)
+    # --- ✅ हा आहे अंतिम आणि अचूक उपाय ---
+    # cerebro.addstrategy() फक्त स्ट्रॅटेजी जोडते, तिचा इंस्टन्स परत करत नाही.
+    # खरा इंस्टन्स आपल्याला cerebro.run() नंतर मिळतो.
+    cerebro.addstrategy(strategy_class)
     
     cerebro.broker.setcommission(commission=0.002)
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trade_analyzer')
     cerebro.addanalyzer(TrendAnalyzer, _name='trend_analyzer')
+    
+    # results मध्ये आता आपल्या चालवलेल्या स्ट्रॅटेजीचा इंस्टन्स आहे.
     results = cerebro.run()
+    strategy_instance = results[0] # हा आहे खरा कर्मचारी!
     
     final_capital = cerebro.broker.getvalue()
-    trade_analysis = results[0].analyzers.trade_analyzer.get_analysis()
-    trend_analysis = results[0].analyzers.trend_analyzer.get_analysis()
+    trade_analysis = strategy_instance.analyzers.trade_analyzer.get_analysis()
+    trend_analysis = strategy_instance.analyzers.trend_analyzer.get_analysis()
     
-    # स्ट्रॅटेजीचा इंस्टन्स परत करणे
+    # आपण आता खरा स्ट्रॅटेजी इंस्टन्स परत पाठवत आहोत.
     return final_capital, trade_analysis, trend_analysis, strategy_instance
