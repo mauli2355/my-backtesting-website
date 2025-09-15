@@ -20,7 +20,10 @@ class TrendAnalyzer(bt.Analyzer):
         return self.results
 
 def run_backtest(data, strategy_class, initial_capital):
-    cerebro = bt.Cerebro()
+    # --- ✅ हा आहे अंतिम आणि अचूक उपाय ---
+    # आपण runonce=False वापरून backtrader ला अधिक सुरक्षितपणे चालवत आहोत.
+    cerebro = bt.Cerebro(runonce=False)
+    
     cerebro.broker.setcash(initial_capital)
     cerebro.adddata(data)
     cerebro.addstrategy(strategy_class)
@@ -29,7 +32,7 @@ def run_backtest(data, strategy_class, initial_capital):
     cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trade_analyzer')
     cerebro.addanalyzer(TrendAnalyzer, _name='trend_analyzer')
     
-    results = cerebro.run()
+    results = cerebro.run() # आता हा कोड सुरक्षितपणे चालेल
     
     final_capital = cerebro.broker.getvalue()
     trade_analysis = results[0].analyzers.trade_analyzer.get_analysis()
