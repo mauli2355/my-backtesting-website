@@ -46,8 +46,15 @@ def backtest():
 
         # TradingView-style interval → yfinance mapping
         tf_map = {
-            "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
-            "1h": "60m", "4h": "240m", "1d": "1d", "1w": "1wk", "1mo": "1mo"
+            "1m": "1m",
+            "5m": "5m",
+            "15m": "15m",
+            "30m": "30m",
+            "1h": "60m",
+            "4h": "4h",   # ✅ FIXED (Yahoo supports '4h')
+            "1d": "1d",
+            "1w": "1wk",
+            "1mo": "1mo"
         }
         interval = tf_map.get(timeframe, "1d")
 
@@ -56,7 +63,7 @@ def backtest():
         # 📌 yfinance period handling
         if interval == "1m":
             data_df = yf.download(stock_name, period="7d", interval=interval)
-        elif interval in ["5m", "15m", "30m", "60m", "240m"]:
+        elif interval in ["5m", "15m", "30m", "60m", "90m", "1h", "4h"]:
             data_df = yf.download(stock_name, period="60d", interval=interval)
         else:
             data_df = yf.download(stock_name, start="2023-01-01", interval=interval)
