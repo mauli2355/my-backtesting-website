@@ -1,15 +1,16 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for, session
 import yfinance as yf
 from datetime import datetime
 import backtrader as bt
 import traceback
 
 from strategies import STRATEGIES
-from backtesting_engine import run_backtest # यात कोणताही बदल नाही
+from backtesting_engine import run_backtest
 from plotting import create_plot
 
 app = Flask(__name__)
-# ... (बाकीचा कोड जसाच्या तसा आहे) ...
+app.secret_key = 'your_super_secret_key_here' # सेशन वापरण्यासाठी सीक्रेट की आवश्यक
+
 TIMEFRAMES = {
     '5m': "5 Minutes", '15m': "15 Minutes", '30m': "30 Minutes",
     '1h': "1 Hour", '1d': "Daily", '1wk': "Weekly", '1mo': "Monthly"
@@ -47,22 +48,45 @@ def backtest():
         
         data = bt.feeds.PandasData(dataname=data_df)
         
-        # run_backtest आता स्ट्रॅटेजीचा इंस्टन्स परत करेल
         final_capital, trade_analysis, trend_analysis, strategy_instance = run_backtest(data, StrategyClass, initial_capital)
         pnl = final_capital - initial_capital
         
-        # आपण आता स्ट्रॅटेजीमधून थेट सिग्नल घेत आहोत
         buy_signals = strategy_instance.buy_signals
         sell_signals = strategy_instance.sell_signals
         
         chart_html = create_plot(data_df, buy_signals, sell_signals, stock_name, strategy_display_name)
 
-        return render_template('result.html', 
-                               stock=stock_name, strategy_name=strategy_display_name,
-                               timeframe=timeframe_display_name, initial_cap=f'{initial_capital:,.2f}',
-                               final_cap=f'{final_capital:,.2f}', pnl=f'{pnl:,.2f}',
-                               chart_html=chart_html, trend_analysis=trend_analysis)
+        # माहिती session मध्ये सेव्ह करा आणि चार्ट पेजवर रिडायरेक्ट करा
+        session['result_data'] = {
+            'stock': stock_name,
+            'strategy_name': strategy_display_name,
+            'timeframe': timeframe_display_name,
+            'initial_cap': f'{initial_capital:,.2f}',
+            'final_cap': f'{final_capital:,.2f}',
+            'pnl': f'{pnl:,.2f}',
+            'chart_html': chart_html,
+            'trend_analysis': trend_analysis,
+            'pnl_numeric': pnl # pnl_numeric देखील जोडा
+        }
+        return redirect(url_for('show_chart'))
+
     except Exception as e:
         error_details = traceback.format_exc()
         print(f"----------- DETAILED ERROR -----------\n{error_details}------------------------------------")
         return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे: {e}</p>"
+
+@app.route('/chart')
+def show_chart():
+    result_data = session.get('result_data')
+    if not result_data:
+        return redirect(url_for('index')) # डेटा नसेल तर होम पेजवर परत पाठवा
+
+    return render_template('chart_page.html', **result_data)
+
+@app.route('/results_summary')
+def show_results_summary():
+    result_data = session.get('result_data')
+    if not result_data:
+        return redirect(url_for('index')) # डेटा नसेल तर होम पेजवर परत पाठवा
+        
+    return render_template('results_summary_page.html', **result_data)

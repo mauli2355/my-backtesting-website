@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ stock }} - Backtest Summary</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+    <style>
+        body { background-color: #1a1a2e; color: #e0e0e0; margin: 0; padding: 0; min-height: 100vh; }
+        .navbar-brand { color: #e0e0e0 !important; font-weight: bold; }
+        .navbar { background-color: #0f3460; }
+        .nav-link { color: #e0e0e0 !important; }
+        .nav-link.active { background-color: #16213e; border-radius: 5px; }
+        footer { background-color: #0f3460; padding: 10px 0; text-align: center; font-size: 0.9em; margin-top: auto; }
+        h1, h2 { color: #e94560; }
+        .card { background-color: #16213e; border: 1px solid #0f3460; color: #e0e0e0; }
+        .table { color: #e0e0e0; }
+        .table th, .table td { border-color: #0f3460; }
+        .table-striped tbody tr:nth-of-type(odd) { background-color: rgba(255, 255, 255, 0.05); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('index') }}">📈 AI Backtester</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('show_chart') }}">📈 Chart</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('show_results_summary') }}">📊 Summary</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Backtest Summary</h1>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header">
+                        <h2>Overall Performance</h2>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Stock Symbol:</strong> {{ stock }}</p>
+                        <p><strong>Strategy:</strong> {{ strategy_name }}</p>
+                        <p><strong>Timeframe:</strong> {{ timeframe }}</p>
+                        <hr>
+                        <p><strong>Initial Capital:</strong> ₹{{ initial_cap }}</p>
+                        <p><strong>Final Capital:</strong> ₹{{ final_cap }}</p>
+                        <p><strong>Profit/Loss (PnL):</strong> <span class="fw-bold {% if pnl_numeric > 0 %}text-success{% elif pnl_numeric < 0 %}text-danger{% else %}text-warning{% endif %}">₹{{ pnl }}</span></p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header">
+                        <h2>Trend-based Performance</h2>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Trend</th>
+                                    <th>Total Trades</th>
+                                    <th>Total PnL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Uptrend</td>
+                                    <td>{{ trend_analysis.uptrend.trades }}</td>
+                                    <td><span class="{% if trend_analysis.uptrend.pnl > 0 %}text-success{% elif trend_analysis.uptrend.pnl < 0 %}text-danger{% else %}text-warning{% endif %}">₹{{ "%.2f"|format(trend_analysis.uptrend.pnl) }}</span></td>
+                                </tr>
+                                <tr>
+                                    <td>Downtrend</td>
+                                    <td>{{ trend_analysis.downtrend.trades }}</td>
+                                    <td><span class="{% if trend_analysis.downtrend.pnl > 0 %}text-success{% elif trend_analysis.downtrend.pnl < 0 %}text-danger{% else %}text-warning{% endif %}">₹{{ "%.2f"|format(trend_analysis.downtrend.pnl) }}</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="text-center mt-4 mb-5">
+            <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">Run Another Backtest</a>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 AI Backtester. All rights reserved.</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
