@@ -5,11 +5,11 @@ import backtrader as bt
 import traceback
 
 from strategies import STRATEGIES
-from backtesting_engine import run_backtest
+from backtesting_engine import run_backtest # यात कोणताही बदल नाही
 from plotting import create_plot
 
 app = Flask(__name__)
-
+# ... (बाकीचा कोड जसाच्या तसा आहे) ...
 TIMEFRAMES = {
     '5m': "5 Minutes", '15m': "15 Minutes", '30m': "30 Minutes",
     '1h': "1 Hour", '1d': "Daily", '1wk': "Weekly", '1mo': "Monthly"
@@ -27,32 +27,35 @@ def backtest():
         timeframe = request.form.get('timeframe')
 
         if not all([stock_name, selected_strategy_key, timeframe]):
-            return "<h1>Error</h1><p>सर्व माहिती (स्टॉक, स्ट्रॅटेजी, टाइमफ्रेम) भरणे आवश्यक आहे.</p>"
+            return "<h1>Error</h1><p>सर्व माहिती भरणे आवश्यक आहे.</p>"
 
         StrategyClass, strategy_display_name = STRATEGIES.get(selected_strategy_key)
         timeframe_display_name = TIMEFRAMES.get(timeframe)
         
         initial_capital = 100000.0
-        
-        # --- ✅ हा आहे अंतिम आणि अचूक उपाय ---
-        # yfinance साठी अधिक सुरक्षित डेटा डाउनलोड करण्याची पद्धत
-        from_date = datetime(2020, 1, 1)
+        from_date = datetime(1996, 1, 1)
         to_date = datetime.now()
 
         if timeframe in ['5m', '15m', '30m', '1h']:
             data_df = yf.Ticker(stock_name).history(period="60d", interval=timeframe)
         else:
-            # Daily, Weekly आणि Monthly साठी 'start' आणि 'end' date वापरणे अधिक सुरक्षित आहे
             data_df = yf.Ticker(stock_name).history(start=from_date, end=to_date, interval=timeframe)
-
-        if data_df.empty: 
-            return f"<h1>Error</h1><p>'{stock_name}' ({timeframe_display_name}) साठी डेटा सापडला नाही. कृपया वेगळा टाइमफ्रेम निवडून प्रयत्न करा.</p>"
+        
+        min_required_data = 200 # Golden Cross साठी
+        if data_df.empty or len(data_df) < min_required_data: 
+            return f"<h1>Error</h1><p>'{stock_name}' ({timeframe_display_name}) साठी पुरेसा डेटा सापडला नाही.</p>"
         
         data = bt.feeds.PandasData(dataname=data_df)
         
-        final_capital, trade_analysis, trend_analysis = run_backtest(data, StrategyClass, initial_capital)
+        # run_backtest आता स्ट्रॅटेजीचा इंस्टन्स परत करेल
+        final_capital, trade_analysis, trend_analysis, strategy_instance = run_backtest(data, StrategyClass, initial_capital)
         pnl = final_capital - initial_capital
-        chart_html = create_plot(data_df, trade_analysis, stock_name, strategy_display_name)
+        
+        # आपण आता स्ट्रॅटेजीमधून थेट सिग्नल घेत आहोत
+        buy_signals = strategy_instance.buy_signals
+        sell_signals = strategy_instance.sell_signals
+        
+        chart_html = create_plot(data_df, buy_signals, sell_signals, stock_name, strategy_display_name)
 
         return render_template('result.html', 
                                stock=stock_name, strategy_name=strategy_display_name,
@@ -61,7 +64,5 @@ def backtest():
                                chart_html=chart_html, trend_analysis=trend_analysis)
     except Exception as e:
         error_details = traceback.format_exc()
-        print("----------- DETAILED ERROR -----------")
-        print(error_details)
-        print("------------------------------------")
+        print(f"----------- DETAILED ERROR -----------\n{error_details}------------------------------------")
         return f"<h1>Application Error</h1><p>एक अनपेक्षित एरर आला आहे: {e}</p>"
