@@ -10,12 +10,8 @@ class EmaCross(bt.Strategy):
         self.sell_signals = []
     def next(self):
         if not self.position:
-            if self.crossover > 0:
-                self.buy()
-                self.buy_signals.append(self.data.datetime.date(0))
-        elif self.crossover < 0:
-            self.close()
-            self.sell_signals.append(self.data.datetime.date(0))
+            if self.crossover > 0: self.buy(); self.buy_signals.append(self.data.datetime.date(0))
+        elif self.crossover < 0: self.close(); self.sell_signals.append(self.data.datetime.date(0))
 
 class RSIStrategy(bt.Strategy):
     params = (('rsi_period', 14), ('oversold', 30), ('overbought', 70))
@@ -25,13 +21,9 @@ class RSIStrategy(bt.Strategy):
         self.sell_signals = []
     def next(self):
         if not self.position:
-            if self.rsi < self.params.oversold:
-                self.buy()
-                self.buy_signals.append(self.data.datetime.date(0))
+            if self.rsi < self.params.oversold: self.buy(); self.buy_signals.append(self.data.datetime.date(0))
         else:
-            if self.rsi > self.params.overbought:
-                self.close()
-                self.sell_signals.append(self.data.datetime.date(0))
+            if self.rsi > self.params.overbought: self.close(); self.sell_signals.append(self.data.datetime.date(0))
 
 class GoldenCross(bt.Strategy):
     params = (('fast_sma', 50), ('slow_sma', 200))
@@ -43,12 +35,8 @@ class GoldenCross(bt.Strategy):
         self.sell_signals = []
     def next(self):
         if not self.position:
-            if self.crossover > 0:
-                self.buy()
-                self.buy_signals.append(self.data.datetime.date(0))
-        elif self.crossover < 0:
-            self.close()
-            self.sell_signals.append(self.data.datetime.date(0))
+            if self.crossover > 0: self.buy(); self.buy_signals.append(self.data.datetime.date(0))
+        elif self.crossover < 0: self.close(); self.sell_signals.append(self.data.datetime.date(0))
 
 STRATEGIES = {
     'ema_cross': (EmaCross, "EMA Crossover (9/20)"),
