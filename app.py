@@ -55,7 +55,6 @@ def backtest():
         timeframe = request.form.get('timeframe')
         indicators_to_plot = request.form.getlist('indicators')
 
-        # येथे कोणताही बदल नाही, हा कोड बरोबर आहे
         StrategyClass, strategy_display_name = STRATEGIES.get(selected_strategy_key)
         
         initial_capital = 100000.0

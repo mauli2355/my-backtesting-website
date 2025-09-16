@@ -1,47 +1,38 @@
 import backtrader as bt
 
-class EmaCross(bt.Strategy):
-    params = (('fast_ema', 9), ('slow_ema', 20))
+class TrendAnalyzer(bt.Analyzer):
     def __init__(self):
-        self.fast_ema = bt.indicators.EMA(self.data.close, period=self.params.fast_ema)
-        self.slow_ema = bt.indicators.EMA(self.data.close, period=self.params.slow_ema)
-        self.crossover = bt.indicators.CrossOver(self.fast_ema, self.slow_ema)
-        self.buy_signals = []
-        self.sell_signals = []
-    def next(self):
-        if not self.position:
-            if self.crossover > 0: self.buy(); self.buy_signals.append(self.data.datetime.date(0))
-        elif self.crossover < 0: self.close(); self.sell_signals.append(self.data.datetime.date(0))
+        self.sma = bt.indicators.SMA(self.data, period=200)
+        self.results = {'uptrend': {'pnl': 0, 'trades': 0}, 'downtrend': {'pnl': 0, 'trades': 0}}
+    def notify_trade(self, trade):
+        if trade.isclosed:
+            price_at_close = self.data.close[0]
+            sma_at_close = self.sma[0]
+            if price_at_close > sma_at_close:
+                self.results['uptrend']['pnl'] += trade.pnlcomm
+                self.results['uptrend']['trades'] += 1
+            else:
+                self.results['downtrend']['pnl'] += trade.pnlcomm
+                self.results['downtrend']['trades'] += 1
+    def get_analysis(self):
+        return self.results
 
-class RSIStrategy(bt.Strategy):
-    params = (('rsi_period', 14), ('oversold', 30), ('overbought', 70))
-    def __init__(self):
-        self.rsi = bt.indicators.RSI(self.data.close, period=self.params.rsi_period)
-        self.buy_signals = []
-        self.sell_signals = []
-    def next(self):
-        if not self.position:
-            if self.rsi < self.params.oversold: self.buy(); self.buy_signals.append(self.data.datetime.date(0))
-        else:
-            if self.rsi > self.params.overbought: self.close(); self.sell_signals.append(self.data.datetime.date(0))
-
-class GoldenCross(bt.Strategy):
-    params = (('fast_sma', 50), ('slow_sma', 200))
-    def __init__(self):
-        fast_sma = bt.indicators.SMA(self.data.close, period=self.params.fast_sma)
-        slow_sma = bt.indicators.SMA(self.data.close, period=self.params.slow_sma)
-        self.crossover = bt.indicators.CrossOver(fast_sma, slow_sma)
-        self.buy_signals = []
-        self.sell_signals = []
-    def next(self):
-        if not self.position:
-            if self.crossover > 0: self.buy(); self.buy_signals.append(self.data.datetime.date(0))
-        elif self.crossover < 0: self.close(); self.sell_signals.append(self.data.datetime.date(0))
-
-# --- ✅ हा आहे अंतिम आणि अचूक उपाय ---
-# आपण येथे क्लासची नावे (EmaCross, RSIStrategy, GoldenCross) वापरत आहोत
-STRATEGIES = {
-    'ema_cross': (EmaCross, "EMA Crossover (9/20)"),
-    'rsi_strategy': (RSIStrategy, "RSI Strategy"),
-    'golden_cross': (GoldenCross, "Golden Cross (50/200 SMA)")
-}
+def run_backtest(data, strategy_class, initial_capital):
+    cerebro = bt.Cerebro(runonce=False)
+    cerebro.broker.setcash(initial_capital)
+    cerebro.adddata(data)
+    strategy_instance = cerebro.addstrategy(strategy_class)
+    
+    cerebro.broker.setcommission(commission=0.002)
+    cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trade_analyzer')
+    cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
+    cerebro.addanalyzer(TrendAnalyzer, _name='trend_analyzer')
+    
+    results = cerebro.run()
+    
+    final_capital = cerebro.broker.getvalue()
+    trade_analysis = results[0].analyzers.trade_analyzer.get_analysis()
+    drawdown_analysis = results[0].analyzers.drawdown.get_analysis()
+    trend_analysis = results[0].analyzers.trend_analyzer.get_analysis()
+    
+    return final_capital, trade_analysis, drawdown_analysis, trend_analysis, strategy_instance
