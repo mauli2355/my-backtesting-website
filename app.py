@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, session, redirect, url_for, jsonify
+from flask import Flask, render_template, request, session, redirect, url_for
 import yfinance as yf
 from datetime import datetime
 import backtrader as bt
 import traceback
+import os
 import pandas as pd
 
 from strategies import STRATEGIES
@@ -40,7 +41,6 @@ def search():
     query = request.args.get('q', '').upper()
     if not query:
         return jsonify([])
-    
     matches = nse_stocks_df[nse_stocks_df['SYMBOL'].str.contains(query, na=False)].head(10)
     return jsonify(matches.to_dict(orient='records'))
 
@@ -53,8 +53,9 @@ def backtest():
         
         selected_strategy_key = request.form.get('strategy')
         timeframe = request.form.get('timeframe')
-        indicators_to_plot = request.form.getlist('indicators') # चेकबॉक्सेसमधून माहिती घेणे
+        indicators_to_plot = request.form.getlist('indicators')
 
+        # येथे कोणताही बदल नाही, हा कोड बरोबर आहे
         StrategyClass, strategy_display_name = STRATEGIES.get(selected_strategy_key)
         
         initial_capital = 100000.0
@@ -78,7 +79,7 @@ def backtest():
         buy_signals = strategy_instance.buy_signals
         sell_signals = strategy_instance.sell_signals
         
-        chart_html = create_plot(data_df, buy_signals, sell_signals, stock_name, strategy_display_name, indicators_to_plot)
+        chart_html = create_plot(data_df, buy_signals, sell_signals, stock_name, strategy_display_name, StrategyClass.params)
 
         total_trades = trade_analysis.get('total', {}).get('total', 0)
         win_trades = trade_analysis.get('won', {}).get('total', 0)
