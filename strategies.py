@@ -1,6 +1,6 @@
 import backtrader as bt
 
-class EmaCrossWithCandleStop(bt.Strategy):
+class EmaCross(bt.Strategy):
     params = (('fast_ema', 9), ('slow_ema', 20))
     def __init__(self):
         self.fast_ema = bt.indicators.EMA(self.data.close, period=self.params.fast_ema)
@@ -33,7 +33,7 @@ class RSIStrategy(bt.Strategy):
                 self.close()
                 self.sell_signals.append(self.data.datetime.date(0))
 
-class GoldenCrossStrategy(bt.Strategy):
+class GoldenCross(bt.Strategy):
     params = (('fast_sma', 50), ('slow_sma', 200))
     def __init__(self):
         fast_sma = bt.indicators.SMA(self.data.close, period=self.params.fast_sma)
@@ -51,7 +51,7 @@ class GoldenCrossStrategy(bt.Strategy):
             self.sell_signals.append(self.data.datetime.date(0))
 
 STRATEGIES = {
-    'ema_cross': (EmaCrossWithCandleStop, "EMA Crossover (9/20)"),
-    'rsi_strategy': (RSIStrategy, "RSI Strategy (Oversold/Overbought)"),
-    'golden_cross': (GoldenCrossStrategy, "Golden Cross (50/200 SMA)")
+    'ema_cross': (EmaCross, "EMA Crossover (9/20)"),
+    'rsi_strategy': (RSIStrategy, "RSI Strategy"),
+    'golden_cross': (GoldenCross, "Golden Cross (50/200 SMA)")
 }
