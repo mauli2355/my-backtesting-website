@@ -38,8 +38,6 @@ class GoldenCross(bt.Strategy):
             if self.crossover > 0: self.buy(); self.buy_signals.append(self.data.datetime.date(0))
         elif self.crossover < 0: self.close(); self.sell_signals.append(self.data.datetime.date(0))
 
-# --- ✅ हा आहे अंतिम आणि अचूक उपाय ---
-# आपण येथे क्लासची नावे (EmaCross, RSIStrategy, GoldenCross) वापरत आहोत
 STRATEGIES = {
     'ema_cross': (EmaCross, "EMA Crossover (9/20)"),
     'rsi_strategy': (RSIStrategy, "RSI Strategy"),
